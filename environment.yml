@@ -1,0 +1,11 @@
+name: blokus-ai
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - pytest
