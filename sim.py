@@ -4,12 +4,13 @@ import random
 
 if __name__ == "__main__":
     boardsize = 20
-    pieces = [Piece(shape, boardsize) for shape in BLOCKS]
+    all_pieces = [set([Piece(shape, boardsize) for shape in BLOCKS]) for _ in range(4)]
 
     game = GameState(boardsize)
 
     while True:
         for player in range(4):
+            pieces = list(all_pieces[player])
             all_positions = []
             num_positions = 0
             for piece in pieces:
@@ -34,6 +35,7 @@ if __name__ == "__main__":
                         piece_idx -= len(positions[j])
                         continue
                     else:
+                        all_pieces[player].remove(piece)
                         game.place(player, piece.transforms[j], positions[j][piece_idx])
                         piece_idx = -1
                         break

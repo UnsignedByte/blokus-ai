@@ -17,6 +17,8 @@ class Piece:
         # make sure all numbers in the shape are either 0 or 1
         assert np.all(np.isin(shape, [0, 1]))
 
+        self.hash = hash("\n".join("".join(map(str, row)) for row in shape))
+
         self.transforms = list(
             set(
                 [
@@ -26,6 +28,9 @@ class Piece:
                 ]
             )
         )
+
+    def __hash__(self) -> int:
+        return self.hash
 
 
 # Single rotation/reflection of a piece
@@ -309,7 +314,6 @@ class GameState:
                 if x < 0 or y < 0 or x >= self.w or y >= self.h:
                     continue
 
-                print("Adding corner", (x, y))
                 self.corners[player][direction].add((x, y))
 
             # loop through corners and remove the ones that are no longer corners
