@@ -174,6 +174,28 @@ class GameState:
             self.right_bitmask ^= 0b1111 << (((i + 1) * self.w - 1) * 4)
             self.left_bitmask ^= 0b1111 << (i * self.w * 4)
 
+        # Bitmask that looks like
+        # 0p0
+        # pap
+        # 0p0
+        # where p is the player bit
+        # and a is 0b1111
+        self.neighbor_bitmasks = [
+            (
+                (0b1111 << ((boardsize + 1) * 4))
+                | (p << (boardsize * 4))
+                | (p << ((boardsize + 2) * 4))
+                | (p << 4)
+                | (p << ((boardsize * 2) + 1) * 4)
+            )
+            for p in [
+                0b0001,
+                0b0010,
+                0b0100,
+                0b1000,
+            ]
+        ]
+
         # A corner is represented by a position.
         # The position is the empty space diagonally adjacent to a block of the right color
 
@@ -243,6 +265,22 @@ class GameState:
 
         return positions
 
+    def check_corner(self, player: int, pos: tuple[int, int]) -> bool:
+        """
+        Checks if a position is a corner
+
+        :param pos: The position to check
+        :return: True if the position is a corner, False otherwise
+        """
+        x, y = pos
+        bitmask = self.neighbor_bitmasks[player] << ((y * self.w + x) * 4)
+        if x == 0:
+            bitmask &= self.right_bitmask
+        elif x == self.w - 1:
+            bitmask &= self.left_bitmask
+
+        return bitmask & self.board == 0
+
     def place(
         self, player: int, pieceTransform: PieceRotation, pos: tuple[int, int]
     ) -> None:
@@ -257,6 +295,28 @@ class GameState:
         bitmask = pieceTransform.block_bitmasks[player]
         bitmask = smart_lshift(bitmask, (py * self.w + px) * 4)
         self.board |= bitmask
+
+        # Now, update the corners
+        for direction in range(4):
+            for tx, ty in pieceTransform.corners[direction]:
+                d = CORNER_ORDER[direction]
+                # Add the actual corner here because the corner in the game is the empty space
+                x = px + tx + d[0]
+                y = py + ty + d[1]
+
+                if x < 0 or y < 0 or x >= self.w or y >= self.h:
+                    continue
+
+                self.corners[player][direction].add((x, y))
+
+            # loop through corners and remove the ones that are no longer corners
+            for p in range(4):
+                self.corners[p][direction] = set(
+                    filter(
+                        lambda x: self.check_corner(p, x),
+                        self.corners[p][direction],
+                    )
+                )
 
     def __repr__(self) -> str:
         ret = ""
