@@ -19,7 +19,7 @@ if __name__ == "__main__":
                 all_positions.append(positions)
 
             if num_positions == 0:
-                break
+                exit(0)
 
             # Choose a random one of the positions
             piece_idx = random.randint(player, len(pieces) - 1)
@@ -40,4 +40,4 @@ if __name__ == "__main__":
                 if piece_idx == -1:
                     break
 
-            print(game)
+            print(game.debug_str(True, True))

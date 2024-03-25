@@ -122,11 +122,11 @@ def test_piece_placements():
             # Place this piece
             new_board.place(0, trans, positions[i][0])
             assert (
-                str(new_board)
-                == "12"
+                new_board.debug_str(False)
+                == "01"
                 + 18 * "-"
                 + "\n"
-                + "11"
+                + "00"
                 + 18 * "-"
                 + "\n"
                 + ("-" * 20 + "\n") * 18
@@ -136,6 +136,38 @@ def test_piece_placements():
 def test_left_right_bitmasks():
     state = GameState()
     state.board = state.left_bitmask
-    assert str(state) == ("-" + "4" * 19 + "\n") * 20
+    assert state.debug_str(False) == ("-" + "X" * 19 + "\n") * 20
     state.board = state.right_bitmask
-    assert str(state) == ("4" * 19 + "-" + "\n") * 20
+    assert state.debug_str(False) == ("X" * 19 + "-" + "\n") * 20
+
+
+def test_neighbor_bitmasks():
+    state = GameState()
+    state.board = state.neighbor_bitmasks[0]
+    print(state.debug_str(False))
+    assert state.debug_str(False) == (
+        "-0-"
+        + "-" * 17
+        + "\n"
+        + "0X0"
+        + "-" * 17
+        + "\n"
+        + "-0-"
+        + "-" * 17
+        + "\n"
+        + ("-" * 20 + "\n") * 17
+    )
+    state.board = state.neighbor_bitmasks[3]
+    print(state.debug_str(False))
+    assert state.debug_str(False) == (
+        "-3-"
+        + "-" * 17
+        + "\n"
+        + "3X3"
+        + "-" * 17
+        + "\n"
+        + "-3-"
+        + "-" * 17
+        + "\n"
+        + ("-" * 20 + "\n") * 17
+    )

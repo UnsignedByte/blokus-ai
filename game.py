@@ -273,7 +273,9 @@ class GameState:
         :return: True if the position is a corner, False otherwise
         """
         x, y = pos
-        bitmask = self.neighbor_bitmasks[player] << ((y * self.w + x) * 4)
+        bitmask = smart_lshift(
+            self.neighbor_bitmasks[player], (((y - 1) * self.w + (x - 1)) * 4)
+        )
         if x == 0:
             bitmask &= self.right_bitmask
         elif x == self.w - 1:
@@ -307,6 +309,7 @@ class GameState:
                 if x < 0 or y < 0 or x >= self.w or y >= self.h:
                     continue
 
+                print("Adding corner", (x, y))
                 self.corners[player][direction].add((x, y))
 
             # loop through corners and remove the ones that are no longer corners
@@ -319,13 +322,56 @@ class GameState:
                 )
 
     def __repr__(self) -> str:
+        return self.debug_str(True, False)
+
+    def debug_str(self, colors: bool, show_corners: bool = False) -> str:
         ret = ""
+        if colors:
+            colors = {
+                0b0001: "\033[91m",  # red
+                0b0010: "\033[94m",  # blue
+                0b0100: "\033[92m",  # green
+                0b1000: "\033[93m",  # yellow
+                0b1111: "\033[95m",  # magenta
+                0: "\033[0m",  # white
+            }
+        else:
+            colors = {
+                0b0001: "",
+                0b0010: "",
+                0b0100: "",
+                0b1000: "",
+                0b1111: "",
+                0: "",
+            }
+
+        chars = {
+            0b0001: "0",
+            0b0010: "1",
+            0b0100: "2",
+            0b1000: "3",
+            0b1111: "X",
+            0: "-",
+        }
+
         for i in range(self.h):
             for j in range(self.w):
+                if show_corners:
+                    # Check if this is a corner
+                    corner = None
+                    for player in range(4):
+                        for direction in range(4):
+                            if (j, i) in self.corners[player][direction]:
+                                corner = player
+                                break
+                    if corner is not None:
+                        ret += colors[1 << corner]
+                    else:
+                        ret += colors[0]
                 onehot = (self.board >> ((i * self.w + j) * 4)) & 0b1111
                 if onehot == 0:
-                    ret += "-"
+                    ret += chars[0]
                 else:
-                    ret += str(int(math.log2(onehot)) + 1)
+                    ret += colors[onehot] + chars[onehot]
             ret += "\n"
         return ret
