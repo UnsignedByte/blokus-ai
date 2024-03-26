@@ -6,7 +6,7 @@ import argparse
 
 
 def algorithm(
-    name: str, moves: list[tuple[PieceRotation, tuple[int, int]]]
+    name: str, game: GameState, moves: list[tuple[PieceRotation, tuple[int, int]]]
 ) -> tuple[PieceRotation, tuple[int, int]]:
     if len(moves) == 0:
         raise ValueError("No moves available")
@@ -15,11 +15,11 @@ def algorithm(
     elif name == "greedy":
         # random sort so that the chosen move is not always the first one
         random.shuffle(moves)
-        return max(moves, key=lambda move: move[0].parent.count)
+        return max(moves, key=lambda move: game.raw_pieces[move[0].parent].count)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Simulate the game")
     parser.add_argument(
         "--algorithm",
         "-a",
@@ -48,11 +48,10 @@ if __name__ == "__main__":
             avg += after - before
 
             if len(moves) == 0:
-                print(f"Player {player} has no moves")
                 fails += 1
                 continue
 
-            move = algorithm(args.algorithm, moves)
+            move = algorithm(args.algorithm, game, moves)
 
             game.place(player, *move)
 

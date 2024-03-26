@@ -15,18 +15,18 @@ CORNER_ORDER = [
 
 # Single piece
 class Piece:
-    def __init__(self, shape: np.ndarray, boardsize: int = 20):
+    def __init__(self, shape: np.ndarray, id: int, boardsize: int = 20):
         # make sure all numbers in the shape are either 0 or 1
         assert np.all(np.isin(shape, [0, 1]))
 
-        self.hash = hash("\n".join("".join(map(str, row)) for row in shape))
+        self.hash = id
 
         self.count = np.sum(shape)
 
         self.transforms = list(
             set(
                 [
-                    PieceRotation(np.rot90(reflshape, rots), boardsize, self)
+                    PieceRotation(np.rot90(reflshape, rots), boardsize, self.hash)
                     for reflshape in [shape, np.fliplr(shape), np.flipud(shape)]
                     for rots in range(4)
                 ]
@@ -37,7 +37,7 @@ class Piece:
         if isinstance(other, Piece):
             return self.hash == other.hash
         elif isinstance(other, PieceRotation):
-            return self == other.parent
+            return self.hash == other.parent
 
         return False
 
@@ -47,7 +47,7 @@ class Piece:
 
 # Single rotation/reflection of a piece
 class PieceRotation:
-    def __init__(self, shape: np.ndarray, boardsize: int, parent: Piece):
+    def __init__(self, shape: np.ndarray, boardsize: int, parent: int):
         # Find the corners of the piece
         # Calculate a hash of the shape specified by
         # the ones and zeroes in the shape separating rows by newlines
@@ -187,9 +187,9 @@ class GameState:
             [set() for _ in range(4)] for _ in range(4)
         ]
 
-        self.pieces = [
-            set([Piece(shape, boardsize) for shape in BLOCKS]) for _ in range(4)
-        ]
+        self.raw_pieces = [Piece(shape, i, boardsize) for i, shape in enumerate(BLOCKS)]
+
+        self.pieces = [set(range(len(self.raw_pieces))) for _ in range(4)]
 
         self.right_bitmask = (1 << (self.w * self.h * 4)) - 1
         self.left_bitmask = (1 << (self.w * self.h * 4)) - 1
@@ -291,7 +291,8 @@ class GameState:
     def get_moves(
         self, player: int
     ) -> Generator[tuple[PieceRotation, tuple[int, int]], None, None]:
-        for piece in self.pieces[player]:
+        for id in self.pieces[player]:
+            piece = self.raw_pieces[id]
             positions = self.get_positions(player, piece)
             for i, pos in enumerate(positions):
                 for p in pos:
