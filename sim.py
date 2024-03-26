@@ -1,45 +1,64 @@
 from blocks import BLOCKS
-from game import Piece, GameState
+from game import Piece, GameState, PieceRotation
 import random
+import time
+import argparse
+
+
+def algorithm(
+    name: str, moves: list[tuple[PieceRotation, tuple[int, int]]]
+) -> tuple[PieceRotation, tuple[int, int]]:
+    if len(moves) == 0:
+        raise ValueError("No moves available")
+    if name == "random":
+        return random.choice(moves)
+    elif name == "greedy":
+        # random sort so that the chosen move is not always the first one
+        random.shuffle(moves)
+        return max(moves, key=lambda move: move[0].parent.count)
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--algorithm",
+        "-a",
+        type=str,
+        default="random",
+        help="Algorithm to use for the AI (random, greedy)",
+    )
+    args = parser.parse_args()
+
     boardsize = 20
-    all_pieces = [set([Piece(shape, boardsize) for shape in BLOCKS]) for _ in range(4)]
 
     game = GameState(boardsize)
 
+    avg = 0
+
+    nmoves = 0
+
     while True:
+        fails = 0
         for player in range(4):
-            pieces = list(all_pieces[player])
-            all_positions = []
-            num_positions = 0
-            for piece in pieces:
-                # Get all possible positions for the piece
-                positions = game.get_positions(player, piece)
-                num_positions += sum(len(i) for i in positions)
-                all_positions.append(positions)
+            nmoves += 1
+            before = time.time_ns()
+            moves = list(game.get_moves(player))
+            after = time.time_ns()
+            print(f"Player {player} has {len(moves)} moves, took {after - before} ns")
+            avg += after - before
 
-            if num_positions == 0:
-                exit(0)
+            if len(moves) == 0:
+                print(f"Player {player} has no moves")
+                fails += 1
+                continue
 
-            # Choose a random one of the positions
-            piece_idx = random.randint(player, len(pieces) - 1)
+            move = algorithm(args.algorithm, moves)
 
-            # Find the position in the list of positions
-
-            for i in range(len(all_positions)):
-                positions = all_positions[i]
-                piece = pieces[i]
-                for j in range(len(positions)):
-                    if len(positions[j]) <= piece_idx:
-                        piece_idx -= len(positions[j])
-                        continue
-                    else:
-                        all_pieces[player].remove(piece)
-                        game.place(player, piece.transforms[j], positions[j][piece_idx])
-                        piece_idx = -1
-                        break
-                if piece_idx == -1:
-                    break
+            game.place(player, *move)
 
             print(game.debug_str(True, True))
+
+        if fails == 4:
+            break
+
+    print(f"Average time per move: {avg / nmoves} ns, {avg / nmoves / 1_000_000} ms")

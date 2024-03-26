@@ -1,6 +1,8 @@
 import numpy as np
 import math
 import itertools
+from blocks import BLOCKS
+from typing import Generator
 
 # Order in which corners are stored
 CORNER_ORDER = [
@@ -19,15 +21,25 @@ class Piece:
 
         self.hash = hash("\n".join("".join(map(str, row)) for row in shape))
 
+        self.count = np.sum(shape)
+
         self.transforms = list(
             set(
                 [
-                    PieceRotation(np.rot90(reflshape, rots), boardsize=boardsize)
+                    PieceRotation(np.rot90(reflshape, rots), boardsize, self)
                     for reflshape in [shape, np.fliplr(shape), np.flipud(shape)]
                     for rots in range(4)
                 ]
             )
         )
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Piece):
+            return self.hash == other.hash
+        elif isinstance(other, PieceRotation):
+            return self == other.parent
+
+        return False
 
     def __hash__(self) -> int:
         return self.hash
@@ -35,7 +47,7 @@ class Piece:
 
 # Single rotation/reflection of a piece
 class PieceRotation:
-    def __init__(self, shape: np.ndarray, boardsize: int = 20):
+    def __init__(self, shape: np.ndarray, boardsize: int, parent: Piece):
         # Find the corners of the piece
         # Calculate a hash of the shape specified by
         # the ones and zeroes in the shape separating rows by newlines
@@ -44,6 +56,8 @@ class PieceRotation:
         # 010
 
         self.hash = hash("\n".join("".join(map(str, row)) for row in shape))
+
+        self.parent = parent
 
         # This is a set of all the corners of the piece
         self.corners = [set() for _ in range(4)]
@@ -173,6 +187,10 @@ class GameState:
             [set() for _ in range(4)] for _ in range(4)
         ]
 
+        self.pieces = [
+            set([Piece(shape, boardsize) for shape in BLOCKS]) for _ in range(4)
+        ]
+
         self.right_bitmask = (1 << (self.w * self.h * 4)) - 1
         self.left_bitmask = (1 << (self.w * self.h * 4)) - 1
         for i in range(self.h):
@@ -270,6 +288,15 @@ class GameState:
 
         return positions
 
+    def get_moves(
+        self, player: int
+    ) -> Generator[tuple[PieceRotation, tuple[int, int]], None, None]:
+        for piece in self.pieces[player]:
+            positions = self.get_positions(player, piece)
+            for i, pos in enumerate(positions):
+                for p in pos:
+                    yield (piece.transforms[i], p)
+
     def check_corner(self, player: int, pos: tuple[int, int]) -> bool:
         """
         Checks if a position is a corner
@@ -298,6 +325,8 @@ class GameState:
         :param pieceTransform: The piece to be placed
         :param pos: The position to place the piece
         """
+        self.pieces[player].remove(pieceTransform.parent)
+
         px, py = pos
         bitmask = pieceTransform.block_bitmasks[player]
         bitmask = smart_lshift(bitmask, (py * self.w + px) * 4)
