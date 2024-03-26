@@ -1,0 +1,6 @@
+[package]
+name = "blokus-ai"
+edition = "2021"
+
+[dependencies]
+bitvec = "1.0.1"

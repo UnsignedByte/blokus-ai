@@ -228,11 +228,11 @@ class GameState:
         # Player 2 gets (board, 0) corner going in the (-1, 1) direction
         self.corners[1][1].add((boardsize - 1, 0))
 
-        # Player 3 gets (0, board) corner going in the (1, -1) direction
-        self.corners[2][2].add((0, boardsize - 1))
+        # Player 3 gets (board, board) corner going in the (-1, -1) direction
+        self.corners[2][0].add((boardsize - 1, boardsize - 1))
 
-        # Player 4 gets (board, board) corner going in the (-1, -1) direction
-        self.corners[3][0].add((boardsize - 1, boardsize - 1))
+        # Player 4 gets (0, board) corner going in the (1, -1) direction
+        self.corners[3][2].add((0, boardsize - 1))
 
     def get_positions(self, player: int, piece: Piece) -> tuple[tuple[int, int], int]:
         """
@@ -248,11 +248,11 @@ class GameState:
             # Pair opposite directions with each other
             # 0 <-> 3
             # 1 <-> 2
-            poss = (
-                list(itertools.product(trans.corners[0], self.corners[player][3]))
-                + list(itertools.product(trans.corners[1], self.corners[player][2]))
-                + list(itertools.product(trans.corners[2], self.corners[player][1]))
-                + list(itertools.product(trans.corners[3], self.corners[player][0]))
+            poss = itertools.chain(
+                itertools.product(trans.corners[0], self.corners[player][3]),
+                itertools.product(trans.corners[1], self.corners[player][2]),
+                itertools.product(trans.corners[2], self.corners[player][1]),
+                itertools.product(trans.corners[3], self.corners[player][0]),
             )
 
             valid_poss = []
@@ -407,5 +407,5 @@ class GameState:
                     ret += chars[0]
                 else:
                     ret += colors[onehot] + chars[onehot]
-            ret += "\n"
+            ret += colors[0] + "\n"
         return ret
