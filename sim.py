@@ -33,7 +33,8 @@ if __name__ == "__main__":
 
     game = GameState(boardsize)
 
-    avg = 0
+    time_avg = 0
+    moves_avg = 0
 
     nmoves = 0
 
@@ -45,7 +46,8 @@ if __name__ == "__main__":
             moves = list(game.get_moves(player))
             after = time.time_ns()
             print(f"Player {player} has {len(moves)} moves, took {after - before} ns")
-            avg += after - before
+            time_avg += after - before
+            moves_avg += len(moves)
 
             if len(moves) == 0:
                 fails += 1
@@ -60,4 +62,7 @@ if __name__ == "__main__":
         if fails == 4:
             break
 
-    print(f"Average time per move: {avg / nmoves} ns, {avg / nmoves / 1_000_000} ms")
+    print(
+        f"Average time per move: {time_avg / nmoves} ns, {time_avg / nmoves / 1_000_000} ms"
+    )
+    print(f"Average number of moves per turn: {moves_avg / nmoves}")
