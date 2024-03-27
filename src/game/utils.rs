@@ -3,31 +3,42 @@ use std::ops::Add;
 #[derive(Clone, Copy, PartialEq, Eq)]
 /// Corner direction mapping.
 pub enum Corner {
-    UpLeft,
-    UpRight,
-    DownLeft,
-    DownRight,
+    PosPos,
+    NegPos,
+    PosNeg,
+    NegNeg,
 }
 
 impl Corner {
+    #[inline]
     pub fn iter() -> impl Iterator<Item = Corner> {
         [
-            Corner::UpLeft,
-            Corner::UpRight,
-            Corner::DownLeft,
-            Corner::DownRight,
+            Corner::PosPos,
+            Corner::NegPos,
+            Corner::PosNeg,
+            Corner::NegNeg,
         ]
         .into_iter()
+    }
+
+    #[inline]
+    pub fn opposite(&self) -> Corner {
+        match self {
+            Corner::PosPos => Corner::NegNeg,
+            Corner::NegPos => Corner::PosNeg,
+            Corner::PosNeg => Corner::NegPos,
+            Corner::NegNeg => Corner::PosPos,
+        }
     }
 }
 
 impl From<Corner> for usize {
     fn from(value: Corner) -> Self {
         match value {
-            Corner::UpLeft => 0,
-            Corner::UpRight => 1,
-            Corner::DownLeft => 2,
-            Corner::DownRight => 3,
+            Corner::PosPos => 0,
+            Corner::NegPos => 1,
+            Corner::PosNeg => 2,
+            Corner::NegNeg => 3,
         }
     }
 }
@@ -35,10 +46,10 @@ impl From<Corner> for usize {
 impl From<usize> for Corner {
     fn from(i: usize) -> Self {
         match i {
-            0 => Corner::UpLeft,
-            1 => Corner::UpRight,
-            2 => Corner::DownLeft,
-            3 => Corner::DownRight,
+            0 => Corner::PosPos,
+            1 => Corner::NegPos,
+            2 => Corner::PosNeg,
+            3 => Corner::NegNeg,
             _ => panic!("Invalid corner"),
         }
     }
@@ -49,10 +60,10 @@ impl Add<(i32, i32)> for Corner {
 
     fn add(self, (x, y): (i32, i32)) -> Self::Output {
         match self {
-            Corner::UpLeft => (x + 1, y - 1),
-            Corner::UpRight => (x - 1, y - 1),
-            Corner::DownLeft => (x + 1, y + 1),
-            Corner::DownRight => (x - 1, y + 1),
+            Corner::PosPos => (x + 1, y + 1),
+            Corner::NegPos => (x - 1, y + 1),
+            Corner::PosNeg => (x + 1, y - 1),
+            Corner::NegNeg => (x - 1, y - 1),
         }
     }
 }
@@ -60,19 +71,20 @@ impl Add<(i32, i32)> for Corner {
 #[derive(Clone, Copy, PartialEq, Eq)]
 /// Neighbor direction mapping.
 pub enum Neighbor {
-    Up,
-    Down,
-    Left,
-    Right,
+    _Pos,
+    _Neg,
+    Pos_,
+    Neg_,
 }
 
 impl Neighbor {
+    #[inline]
     pub fn iter() -> impl Iterator<Item = Neighbor> {
         [
-            Neighbor::Up,
-            Neighbor::Down,
-            Neighbor::Left,
-            Neighbor::Right,
+            Neighbor::_Pos,
+            Neighbor::_Neg,
+            Neighbor::Pos_,
+            Neighbor::Neg_,
         ]
         .into_iter()
     }
@@ -81,10 +93,10 @@ impl Neighbor {
 impl From<Neighbor> for usize {
     fn from(value: Neighbor) -> Self {
         match value {
-            Neighbor::Up => 0,
-            Neighbor::Down => 1,
-            Neighbor::Left => 2,
-            Neighbor::Right => 3,
+            Neighbor::_Pos => 0,
+            Neighbor::_Neg => 1,
+            Neighbor::Pos_ => 2,
+            Neighbor::Neg_ => 3,
         }
     }
 }
@@ -92,10 +104,10 @@ impl From<Neighbor> for usize {
 impl From<usize> for Neighbor {
     fn from(i: usize) -> Self {
         match i {
-            0 => Neighbor::Up,
-            1 => Neighbor::Down,
-            2 => Neighbor::Left,
-            3 => Neighbor::Right,
+            0 => Neighbor::_Pos,
+            1 => Neighbor::_Neg,
+            2 => Neighbor::Pos_,
+            3 => Neighbor::Neg_,
             _ => panic!("Invalid neighbor"),
         }
     }
@@ -106,10 +118,16 @@ impl Add<(i32, i32)> for Neighbor {
 
     fn add(self, (x, y): (i32, i32)) -> Self::Output {
         match self {
-            Neighbor::Up => (x, y - 1),
-            Neighbor::Down => (x, y + 1),
-            Neighbor::Left => (x + 1, y),
-            Neighbor::Right => (x - 1, y),
+            Neighbor::_Pos => (x, y + 1),
+            Neighbor::_Neg => (x, y - 1),
+            Neighbor::Pos_ => (x + 1, y),
+            Neighbor::Neg_ => (x - 1, y),
         }
     }
+}
+
+pub trait Dimensioned {
+    fn w(&self) -> usize;
+
+    fn h(&self) -> usize;
 }

@@ -1,7 +1,9 @@
 use std::{
     cmp::{max, min},
-    ops::{Index, IndexMut},
+    ops::Shl,
 };
+
+use super::Dimensioned;
 
 enum BitOp {
     And,
@@ -43,21 +45,10 @@ impl Mask {
         debug_assert!(width * 4 <= 64);
 
         // Now, make sure every row is contained in the width
+        // This is disabled as we are using a const function
         debug_assert!(mask.iter().all(|&row| row < (1 << (width * 4))));
 
         Self { width, mask }
-    }
-
-    #[inline]
-    /// Get the width of the mask
-    pub fn w(&self) -> usize {
-        self.width
-    }
-
-    #[inline]
-    /// Get the height of the mask
-    pub fn h(&self) -> usize {
-        self.mask.len()
     }
 
     /// Set the value of a cell in the mask
@@ -137,6 +128,29 @@ impl Mask {
             })
             .collect();
 
+        Mask::new(self.w(), mask)
+    }
+}
+
+impl Dimensioned for Mask {
+    #[inline]
+    /// Get the width of the mask
+    fn w(&self) -> usize {
+        self.width
+    }
+
+    #[inline]
+    /// Get the height of the mask
+    fn h(&self) -> usize {
+        self.mask.len()
+    }
+}
+
+impl Shl<usize> for Mask {
+    type Output = Mask;
+
+    fn shl(self, rhs: usize) -> Self::Output {
+        let mask = self.mask.iter().map(|&row| row << rhs).collect();
         Mask::new(self.w(), mask)
     }
 }

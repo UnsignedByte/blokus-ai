@@ -1,6 +1,6 @@
-use std::{collections::HashSet, hash::Hash, ops::Add};
+use std::{collections::HashSet, hash::Hash};
 
-use crate::game::{Corner, Neighbor};
+use crate::game::{Corner, Dimensioned, Neighbor};
 
 use super::Mask;
 
@@ -81,8 +81,7 @@ fn transform(transformation: Transformation, mask: &Mask) -> Mask {
 }
 
 /// Transformed piece.
-struct TransformedPiece {
-    mask: Mask,
+pub struct TransformedPiece {
     /// Mask representing the neighbors of the piece
     /// in the board.
     /// If the piece looks like
@@ -93,9 +92,9 @@ struct TransformedPiece {
     ///   01f1
     ///   1ff1
     ///   0110
-    neighbor_mask: Mask,
+    pub neighbor_mask: Mask,
     /// Corners of the pieces
-    corners: [Vec<(usize, usize)>; 4],
+    pub corners: [Vec<(usize, usize)>; 4],
 }
 
 impl TransformedPiece {
@@ -133,24 +132,38 @@ impl TransformedPiece {
                 }
             }
         }
+
         let neighbor_mask = Mask::new(mask.w(), vec![0; mask.h()]);
         Self {
-            mask,
             neighbor_mask,
             corners,
         }
     }
 }
 
+impl Dimensioned for TransformedPiece {
+    #[inline]
+    /// Get the width of the mask
+    fn w(&self) -> usize {
+        self.neighbor_mask.w() - 2
+    }
+
+    #[inline]
+    /// Get the height of the mask
+    fn h(&self) -> usize {
+        self.neighbor_mask.h() - 2
+    }
+}
+
 impl Hash for TransformedPiece {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.mask.hash(state);
+        self.neighbor_mask.hash(state);
     }
 }
 
 impl PartialEq for TransformedPiece {
     fn eq(&self, other: &Self) -> bool {
-        self.mask == other.mask
+        self.neighbor_mask == other.neighbor_mask
     }
 }
 
@@ -159,7 +172,7 @@ impl Eq for TransformedPiece {}
 /// A piece in the game.
 pub struct Piece {
     /// The different unique versions of the piece.
-    versions: Vec<TransformedPiece>,
+    pub versions: Vec<TransformedPiece>,
 }
 
 impl Piece {
@@ -174,6 +187,15 @@ impl Piece {
     }
 }
 
+impl Iterator for Piece {
+    type Item = TransformedPiece;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.versions.pop()
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

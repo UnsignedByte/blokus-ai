@@ -4,6 +4,6 @@ mod state;
 mod utils;
 
 pub use mask::Mask;
-pub use piece::Piece;
+pub use piece::{Piece, TransformedPiece};
 pub use state::State;
-pub use utils::{Corner, Neighbor};
+pub use utils::{Corner, Dimensioned, Neighbor};
