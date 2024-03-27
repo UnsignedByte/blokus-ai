@@ -4,6 +4,7 @@ use itertools::Itertools;
 use crate::game::Dimensioned;
 
 use super::{utils::Player, Corner, Mask, Piece};
+use core::panic;
 use std::{collections::HashSet, fmt::Debug};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -33,14 +34,14 @@ impl From<&PieceID> for usize {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 /// A piece transform ID.
 pub struct PieceTransformID {
-    piece: usize,
+    piece: PieceID,
     version: usize,
 }
 
 impl PieceTransformID {
     pub fn new(piece: &PieceID, version: usize) -> Self {
         Self {
-            piece: piece.into(),
+            piece: *piece,
             version,
         }
     }
@@ -85,9 +86,10 @@ impl<'game> State<'game> {
 
     fn get_moves_for_piece<'a>(
         &'a self,
-        player: usize,
+        player: &Player,
         piece: &'a PieceID,
     ) -> impl Iterator<Item = (PieceTransformID, (usize, usize))> + 'a {
+        let player = usize::from(player);
         debug_assert!(
             self.player_pieces[player].contains(piece),
             "Attempted to play a piece that the player doesn't have."
@@ -99,8 +101,6 @@ impl<'game> State<'game> {
             .enumerate()
             .flat_map(move |(tid, piece_transform)| {
                 let tid = PieceTransformID::new(piece, tid);
-                let w = piece_transform.w();
-                let h = piece_transform.h();
 
                 // Set of possible moves to try
                 self.corners[player]
@@ -138,12 +138,59 @@ impl<'game> State<'game> {
     /// Get the possible moves for a player
     pub fn get_moves<'a>(
         &'a self,
-        player: usize,
+        player: &'a Player,
     ) -> impl Iterator<Item = (PieceTransformID, (usize, usize))> + 'a {
         // All the different piece transforms for the player
-        self.player_pieces[player]
+        self.player_pieces[usize::from(player)]
             .iter()
             .flat_map(move |piece| self.get_moves_for_piece(player, piece))
+    }
+
+    /// Place a piece on the board
+    pub fn place_piece(&mut self, player: &Player, piece: PieceTransformID, pos: (usize, usize)) {
+        let transformed_piece =
+            &self.pieces[usize::from(player)][usize::from(piece.piece)].versions[piece.version];
+
+        let (x, y) = pos;
+
+        // Check if the piece can be placed
+        debug_assert!(
+            self.board
+                .and(&transformed_piece.neighbor_mask, (x as i32, y as i32))
+                .empty(),
+            "Position already contained filled tiles."
+        );
+        debug_assert!(
+            self.corners[usize::from(player)]
+                .iter()
+                .all(|corners| corners.contains(&(x, y))),
+            "Piece was not in a corner."
+        );
+
+        // Place the piece on the board
+        self.board
+            .or(&transformed_piece.neighbor_mask, (x as i32, y as i32));
+        // Remove the piece from the player's pieces
+        self.player_pieces[usize::from(player)].remove(&piece.piece);
+
+        // Update the corners
+        for (x, y, v) in transformed_piece.tile_iter() {
+            match v {
+                0b1111 => {
+                    for cornerset in self.corners.iter_mut() {
+                        for corner in cornerset.iter_mut() {
+                            corner.remove(&(x, y));
+                        }
+                    }
+                }
+                p if p == player.mask() => {
+                    for corner in self.corners[usize::from(player)].iter_mut() {
+                        corner.remove(&(x, y));
+                    }
+                }
+                _ => panic!("Invalid tile value"),
+            }
+        }
     }
 }
 
@@ -167,10 +214,10 @@ impl Debug for State<'_> {
                 let color = match cell {
                     0b0000 => None,
                     0b1111 => Some(Color::Purple),
-                    0b0001 => Some(Player::Player1.color()),
-                    0b0010 => Some(Player::Player2.color()),
-                    0b0100 => Some(Player::Player3.color()),
-                    0b1000 => Some(Player::Player4.color()),
+                    x if x == Player::Player1.mask() => Some(Player::Player1.color()),
+                    x if x == Player::Player2.mask() => Some(Player::Player2.color()),
+                    x if x == Player::Player3.mask() => Some(Player::Player3.color()),
+                    x if x == Player::Player4.mask() => Some(Player::Player4.color()),
                     _ => panic!("Invalid cell value"),
                 };
                 write!(

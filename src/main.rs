@@ -1,4 +1,4 @@
-use blokus_ai::game::{Mask, Piece};
+use blokus_ai::game::{Mask, Piece, State};
 use once_cell::sync::Lazy;
 
 static PIECES: Lazy<[Vec<Piece>; 4]> = Lazy::new(|| {
@@ -64,4 +64,8 @@ static PIECES: Lazy<[Vec<Piece>; 4]> = Lazy::new(|| {
     ]
 });
 
-fn main() {}
+fn main() {
+    let game = State::new(20, 20, &PIECES);
+
+    println!("{:?}", game)
+}

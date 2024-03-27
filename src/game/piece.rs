@@ -59,7 +59,7 @@ fn rotate(mask: &Mask) -> Mask {
 /// Flip a mask vertically.
 fn flip(mask: Mask) -> Mask {
     let w = mask.w();
-    let raw: Vec<u64> = mask.into();
+    let raw: Vec<u128> = mask.into();
     let raw = raw.into_iter().rev().collect();
 
     Mask::new(w, raw)
@@ -138,6 +138,20 @@ impl TransformedPiece {
             neighbor_mask,
             corners,
         }
+    }
+
+    /// Iterate over all non-empty cells in the neighbor mask
+    pub fn tile_iter(&self) -> impl Iterator<Item = (usize, usize, u128)> + '_ {
+        (0..self.neighbor_mask.w()).flat_map(move |x| {
+            (0..self.neighbor_mask.h()).filter_map(move |y| {
+                let v = self.neighbor_mask.get(x, y).unwrap();
+                if v != 0 {
+                    Some((x, y, v))
+                } else {
+                    None
+                }
+            })
+        })
     }
 }
 

@@ -164,6 +164,16 @@ impl Player {
             Player::Player4 => Color::Blue,   // blue
         }
     }
+
+    #[inline]
+    pub const fn mask(&self) -> u128 {
+        match self {
+            Player::Player1 => 0b0001,
+            Player::Player2 => 0b0010,
+            Player::Player3 => 0b0100,
+            Player::Player4 => 0b1000,
+        }
+    }
 }
 
 impl From<usize> for Player {
@@ -180,6 +190,17 @@ impl From<usize> for Player {
 
 impl From<Player> for usize {
     fn from(value: Player) -> Self {
+        match value {
+            Player::Player1 => 0,
+            Player::Player2 => 1,
+            Player::Player3 => 2,
+            Player::Player4 => 3,
+        }
+    }
+}
+
+impl From<&Player> for usize {
+    fn from(value: &Player) -> Self {
         match value {
             Player::Player1 => 0,
             Player::Player2 => 1,

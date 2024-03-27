@@ -11,7 +11,7 @@ enum BitOp {
 }
 
 #[inline]
-fn shift(x: u64, y: i32) -> u64 {
+fn shift(x: u128, y: i32) -> u128 {
     if y < 0 {
         x >> -y
     } else {
@@ -33,16 +33,16 @@ pub struct Mask {
     width: usize,
     /// The mask stored as a single bitslice
     /// flattened
-    mask: Vec<u64>,
+    mask: Vec<u128>,
 }
 
 impl Mask {
     /// Generate a bitmask from a 2D array of bytes.
     /// Each byte represents a cell on the board.
-    pub fn new(width: usize, mask: Vec<u64>) -> Self {
-        // Each row can be at most 64 bits wide
-        // as it is stored as a single u64
-        debug_assert!(width * 4 <= 64);
+    pub fn new(width: usize, mask: Vec<u128>) -> Self {
+        // Each row can be at most 128 bits wide
+        // as it is stored as a single u128
+        debug_assert!(width * 4 <= 128);
 
         // Now, make sure every row is contained in the width
         // This is disabled as we are using a const function
@@ -52,7 +52,7 @@ impl Mask {
     }
 
     /// Set the value of a cell in the mask
-    pub fn set(&mut self, x: usize, y: usize, value: u64) {
+    pub fn set(&mut self, x: usize, y: usize, value: u128) {
         debug_assert!(x < self.w());
         debug_assert!(y < self.h());
         self.mask[y] = self.mask[y] & !(0xF << (x * 4)) | (value << (x * 4));
@@ -60,7 +60,7 @@ impl Mask {
 
     /// Get the value of a cell in the mask
     /// Returns None if the position is out of bounds
-    pub fn get_i32(&self, x: i32, y: i32) -> Option<u64> {
+    pub fn get_i32(&self, x: i32, y: i32) -> Option<u128> {
         if x < 0 || y < 0 {
             return None;
         }
@@ -69,7 +69,7 @@ impl Mask {
 
     /// Get the value of a cell in the mask
     /// Returns None if the position is out of bounds
-    pub fn get(&self, x: usize, y: usize) -> Option<u64> {
+    pub fn get(&self, x: usize, y: usize) -> Option<u128> {
         if x >= self.w() || y >= self.h() {
             return None;
         }
@@ -77,7 +77,7 @@ impl Mask {
     }
 
     /// Set the value of a cell in the mask without checking if the position is empty
-    pub fn set_unchecked(&mut self, x: usize, y: usize, value: u64) {
+    pub fn set_unchecked(&mut self, x: usize, y: usize, value: u128) {
         debug_assert!(x < self.w());
         debug_assert!(y < self.h());
         self.mask[y] |= value << (x * 4);
@@ -130,6 +130,10 @@ impl Mask {
 
         Mask::new(self.w(), mask)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &'_ u128> {
+        self.mask.iter()
+    }
 }
 
 impl Dimensioned for Mask {
@@ -164,7 +168,7 @@ impl std::fmt::Debug for Mask {
     }
 }
 
-impl From<Mask> for Vec<u64> {
+impl From<Mask> for Vec<u128> {
     fn from(mask: Mask) -> Self {
         mask.mask
     }
