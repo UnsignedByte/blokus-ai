@@ -1,9 +1,10 @@
+use ansi_term::Color;
 use itertools::Itertools;
 
 use crate::game::Dimensioned;
 
-use super::{Corner, Mask, Piece, TransformedPiece};
-use std::collections::HashSet;
+use super::{utils::Player, Corner, Mask, Piece};
+use std::{collections::HashSet, fmt::Debug};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 /// A piece ID.
@@ -49,17 +50,17 @@ impl PieceTransformID {
 pub struct State<'game> {
     board: Mask,
     /// Corners for every player
-    /// separated by direction
-    corners: [[HashSet<(usize, usize)>; 4]; 4],
-    /// Pieces for every player
-    player_pieces: [HashSet<PieceID>; 4],
-    /// All pieces
-    pieces: &'game [Vec<Piece>; 4],
+    /// separated by corner direction
+    corners: [[HashSet<(usize, usize)>; Corner::N]; Player::N],
+    /// Playable pieces for every player
+    player_pieces: [HashSet<PieceID>; Player::N],
+    /// All pieces for every player
+    pieces: &'game [Vec<Piece>; Player::N],
 }
 
 impl<'game> State<'game> {
-    pub fn new(w: usize, h: usize, pieces: &'game [Vec<Piece>; 4]) -> Self {
-        let mut corners: [[HashSet<(usize, usize)>; 4]; 4] =
+    pub fn new(w: usize, h: usize, pieces: &'game [Vec<Piece>; Player::N]) -> Self {
+        let mut corners: [[HashSet<(usize, usize)>; Corner::N]; Player::N] =
             std::array::from_fn(|_| std::array::from_fn(|_| HashSet::new()));
 
         // First player starts at the (0, 0) corner
@@ -82,23 +83,13 @@ impl<'game> State<'game> {
         }
     }
 
-    #[inline]
-    /// Get a piece transform from a piece transform ID
-    fn get_piece_transform(
-        &self,
-        player: usize,
-        piece_transform: PieceTransformID,
-    ) -> &TransformedPiece {
-        &self.pieces[player][piece_transform.piece].versions[piece_transform.version]
-    }
-
     fn get_moves_for_piece<'a>(
         &'a self,
         player: usize,
         piece: &'a PieceID,
     ) -> impl Iterator<Item = (PieceTransformID, (usize, usize))> + 'a {
         debug_assert!(
-            self.player_pieces[player].contains(&piece),
+            self.player_pieces[player].contains(piece),
             "Attempted to play a piece that the player doesn't have."
         );
 
@@ -165,5 +156,34 @@ impl Dimensioned for State<'_> {
     #[inline]
     fn h(&self) -> usize {
         self.board.h()
+    }
+}
+
+impl Debug for State<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for row in 0..self.h() {
+            for col in 0..self.w() {
+                let cell = self.board.get(col, row).unwrap();
+                let color = match cell {
+                    0b0000 => None,
+                    0b1111 => Some(Color::Purple),
+                    0b0001 => Some(Player::Player1.color()),
+                    0b0010 => Some(Player::Player2.color()),
+                    0b0100 => Some(Player::Player3.color()),
+                    0b1000 => Some(Player::Player4.color()),
+                    _ => panic!("Invalid cell value"),
+                };
+                write!(
+                    f,
+                    "{}",
+                    color
+                        .map(|color| color.paint("■"))
+                        .unwrap_or_else(|| "□".into())
+                )?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
     }
 }

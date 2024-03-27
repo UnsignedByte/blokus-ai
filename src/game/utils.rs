@@ -1,5 +1,7 @@
 use std::ops::Add;
 
+use ansi_term::Color;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 /// Corner direction mapping.
 pub enum Corner {
@@ -10,6 +12,8 @@ pub enum Corner {
 }
 
 impl Corner {
+    pub const N: usize = 4;
+
     #[inline]
     pub fn iter() -> impl Iterator<Item = Corner> {
         [
@@ -78,6 +82,8 @@ pub enum Neighbor {
 }
 
 impl Neighbor {
+    pub const N: usize = 4;
+
     #[inline]
     pub fn iter() -> impl Iterator<Item = Neighbor> {
         [
@@ -126,6 +132,64 @@ impl Add<(i32, i32)> for Neighbor {
     }
 }
 
+/// Enum for every player.
+pub enum Player {
+    Player1,
+    Player2,
+    Player3,
+    Player4,
+}
+
+impl Player {
+    pub const N: usize = 4;
+
+    #[inline]
+    pub fn iter() -> impl Iterator<Item = Player> {
+        [
+            Player::Player1,
+            Player::Player2,
+            Player::Player3,
+            Player::Player4,
+        ]
+        .into_iter()
+    }
+
+    #[inline]
+    /// Get the ansi color code for the player.
+    pub fn color(&self) -> Color {
+        match self {
+            Player::Player1 => Color::Red,
+            Player::Player2 => Color::Green,  // green
+            Player::Player3 => Color::Yellow, // yellow
+            Player::Player4 => Color::Blue,   // blue
+        }
+    }
+}
+
+impl From<usize> for Player {
+    fn from(i: usize) -> Self {
+        match i {
+            0 => Player::Player1,
+            1 => Player::Player2,
+            2 => Player::Player3,
+            3 => Player::Player4,
+            _ => panic!("Invalid player"),
+        }
+    }
+}
+
+impl From<Player> for usize {
+    fn from(value: Player) -> Self {
+        match value {
+            Player::Player1 => 0,
+            Player::Player2 => 1,
+            Player::Player3 => 2,
+            Player::Player4 => 3,
+        }
+    }
+}
+
+/// A trait for getting the dimensions of an object.
 pub trait Dimensioned {
     fn w(&self) -> usize;
 

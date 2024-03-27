@@ -94,13 +94,13 @@ pub struct TransformedPiece {
     ///   0110
     pub neighbor_mask: Mask,
     /// Corners of the pieces
-    pub corners: [Vec<(usize, usize)>; 4],
+    pub corners: [Vec<(usize, usize)>; Corner::N],
 }
 
 impl TransformedPiece {
     pub fn new(mask: Mask) -> Self {
         const EMPTY: Vec<(usize, usize)> = Vec::new();
-        let mut corners = [EMPTY; 4];
+        let mut corners = [EMPTY; Corner::N];
 
         let mut neighbor_mask = Mask::new(mask.w() + 2, vec![0; mask.h() + 2]);
         for i in 0..mask.w() {
