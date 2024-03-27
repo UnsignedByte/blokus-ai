@@ -60,16 +60,36 @@ impl Mask {
         self.mask.len()
     }
 
+    /// Set the value of a cell in the mask
     pub fn set(&mut self, x: usize, y: usize, value: u64) {
         debug_assert!(x < self.w());
         debug_assert!(y < self.h());
         self.mask[y] = self.mask[y] & !(0xF << (x * 4)) | (value << (x * 4));
     }
 
-    pub fn get(&self, x: usize, y: usize) -> u64 {
+    /// Get the value of a cell in the mask
+    /// Returns None if the position is out of bounds
+    pub fn get_i32(&self, x: i32, y: i32) -> Option<u64> {
+        if x < 0 || y < 0 {
+            return None;
+        }
+        self.get(x as usize, y as usize)
+    }
+
+    /// Get the value of a cell in the mask
+    /// Returns None if the position is out of bounds
+    pub fn get(&self, x: usize, y: usize) -> Option<u64> {
+        if x >= self.w() || y >= self.h() {
+            return None;
+        }
+        Some(self.mask[y] >> (x * 4) & 0xF)
+    }
+
+    /// Set the value of a cell in the mask without checking if the position is empty
+    pub fn set_unchecked(&mut self, x: usize, y: usize, value: u64) {
         debug_assert!(x < self.w());
         debug_assert!(y < self.h());
-        self.mask[y] >> (x * 4) & 0xF
+        self.mask[y] |= value << (x * 4);
     }
 
     /// Check if the mask is all zeros

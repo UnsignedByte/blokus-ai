@@ -1,3 +1,7 @@
+use std::{collections::HashSet, hash::Hash, ops::Add};
+
+use crate::game::{Corner, Neighbor};
+
 use super::Mask;
 
 #[derive(Clone, Hash)]
@@ -20,6 +24,24 @@ enum Reflection {
 /// A transformation
 struct Transformation(Rotation, Reflection);
 
+impl Transformation {
+    fn iter() -> impl Iterator<Item = Transformation> {
+        use Reflection::*;
+        use Rotation::*;
+        [
+            Transformation(Zero, NoFlip),
+            Transformation(Ninety, NoFlip),
+            Transformation(OneEighty, NoFlip),
+            Transformation(TwoSeventy, NoFlip),
+            Transformation(Zero, Flip),
+            Transformation(Ninety, Flip),
+            Transformation(OneEighty, Flip),
+            Transformation(TwoSeventy, Flip),
+        ]
+        .into_iter()
+    }
+}
+
 /// Rotate a mask by 90 degrees clockwise.
 fn rotate(mask: &Mask) -> Mask {
     let width = mask.w();
@@ -27,7 +49,7 @@ fn rotate(mask: &Mask) -> Mask {
     let mut new_mask = Mask::new(height, vec![0; width]);
     for i in 0..width {
         for j in 0..height {
-            let bit = mask.get(i, j);
+            let bit = mask.get(i, j).unwrap();
             new_mask.set(j, width - i - 1, bit);
         }
     }
@@ -72,14 +94,84 @@ struct TransformedPiece {
     ///   1ff1
     ///   0110
     neighbor_mask: Mask,
+    /// Corners of the pieces
+    corners: [Vec<(usize, usize)>; 4],
 }
 
-impl TransformedPiece {}
+impl TransformedPiece {
+    pub fn new(mask: Mask) -> Self {
+        const EMPTY: Vec<(usize, usize)> = Vec::new();
+        let mut corners = [EMPTY; 4];
+
+        let mut neighbor_mask = Mask::new(mask.w() + 2, vec![0; mask.h() + 2]);
+        for i in 0..mask.w() {
+            for j in 0..mask.h() {
+                let cell = mask.get(i, j).unwrap();
+                if cell == 0 {
+                    continue;
+                }
+                // In the neighbor mask, set this cell to F
+                neighbor_mask.set_unchecked(i + 1, j + 1, 0xF);
+                // set the neighbors to the value of the cell
+                for neighbor in Neighbor::iter() {
+                    let (x, y) = neighbor + (i as i32, j as i32);
+
+                    neighbor_mask.set_unchecked((x + 1) as usize, (y + 1) as usize, cell);
+                }
+
+                // Check if this is a corner for each direction
+                for corner in Corner::iter() {
+                    let (x, y) = corner + (i as i32, j as i32);
+
+                    let neighbor1 = mask.get_i32(x, j as i32).unwrap_or(0);
+                    let neighbor2 = mask.get_i32(i as i32, y).unwrap_or(0);
+
+                    if neighbor1 == 0 && neighbor2 == 0 {
+                        debug_assert!(mask.get_i32(x, y).unwrap_or(0) == 0);
+                        corners[corner as usize].push((i, j));
+                    }
+                }
+            }
+        }
+        let neighbor_mask = Mask::new(mask.w(), vec![0; mask.h()]);
+        Self {
+            mask,
+            neighbor_mask,
+            corners,
+        }
+    }
+}
+
+impl Hash for TransformedPiece {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.mask.hash(state);
+    }
+}
+
+impl PartialEq for TransformedPiece {
+    fn eq(&self, other: &Self) -> bool {
+        self.mask == other.mask
+    }
+}
+
+impl Eq for TransformedPiece {}
 
 /// A piece in the game.
 pub struct Piece {
     /// The different unique versions of the piece.
     versions: Vec<TransformedPiece>,
+}
+
+impl Piece {
+    pub fn new(mask: Mask) -> Self {
+        let versions: Vec<_> = Transformation::iter()
+            .map(|transformation| TransformedPiece::new(transform(transformation, &mask)))
+            .collect::<HashSet<TransformedPiece>>()
+            .into_iter()
+            .collect();
+
+        Self { versions }
+    }
 }
 
 mod tests {
@@ -94,6 +186,15 @@ mod tests {
         // 10
         // 11
         assert_eq!(rotated, Mask::new(2, vec![0x10, 0x11]));
+
+        // 011
+        // 110
+        let mask = Mask::new(3, vec![0x011, 0x110]);
+        let rotated = rotate(&mask);
+        // 10
+        // 11
+        // 01
+        assert_eq!(rotated, Mask::new(2, vec![0x10, 0x11, 0x01]));
     }
 
     #[test]
@@ -117,5 +218,24 @@ mod tests {
         // 11
         let transformed = transform(transformation, &mask);
         assert_eq!(transformed, Mask::new(2, vec![0x10, 0x11]));
+    }
+
+    #[test]
+    fn test_unique_transformation_count() {
+        let mask = Mask::new(3, vec![0x010, 0x111, 0x010]);
+        let piece = Piece::new(mask);
+        assert_eq!(piece.versions.len(), 1);
+
+        let mask = Mask::new(2, vec![0x01, 0x11]);
+        let piece = Piece::new(mask);
+        assert_eq!(piece.versions.len(), 4);
+
+        let mask = Mask::new(3, vec![0x011, 0x110]);
+        let piece = Piece::new(mask);
+        assert_eq!(piece.versions.len(), 4);
+
+        let mask = Mask::new(3, vec![0x100, 0x111]);
+        let piece = Piece::new(mask);
+        assert_eq!(piece.versions.len(), 8);
     }
 }
