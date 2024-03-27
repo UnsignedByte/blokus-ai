@@ -1,4 +1,7 @@
-use std::ops::Add;
+use std::{
+    fmt::{Debug, Display},
+    ops::Add,
+};
 
 use ansi_term::Color;
 
@@ -173,6 +176,13 @@ impl Player {
             Player::Player3 => 0b0100,
             Player::Player4 => 0b1000,
         }
+    }
+}
+
+impl Display for Player {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let color = self.color();
+        write!(f, "{}", color.paint(format!("{}", usize::from(self))))
     }
 }
 

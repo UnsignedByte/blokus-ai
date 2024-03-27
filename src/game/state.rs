@@ -5,7 +5,10 @@ use crate::game::Dimensioned;
 
 use super::{utils::Player, Corner, Mask, Piece};
 use core::panic;
-use std::{collections::HashSet, fmt::Debug};
+use std::{
+    collections::HashSet,
+    fmt::{Debug, Display},
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 /// A piece ID.
@@ -44,6 +47,30 @@ impl PieceTransformID {
             piece: *piece,
             version,
         }
+    }
+}
+
+/// A move.
+pub struct Move {
+    piece: PieceTransformID,
+    pos: (usize, usize),
+}
+
+impl Move {
+    pub fn new(piece: PieceTransformID, pos: (usize, usize)) -> Self {
+        Self { piece, pos }
+    }
+}
+
+impl From<(PieceTransformID, (usize, usize))> for Move {
+    fn from((piece, pos): (PieceTransformID, (usize, usize))) -> Self {
+        Self { piece, pos }
+    }
+}
+
+impl From<Move> for (PieceTransformID, (usize, usize)) {
+    fn from(m: Move) -> Self {
+        (m.piece, m.pos)
     }
 }
 
@@ -88,7 +115,7 @@ impl<'game> State<'game> {
         &'a self,
         player: &Player,
         piece: &'a PieceID,
-    ) -> impl Iterator<Item = (PieceTransformID, (usize, usize))> + 'a {
+    ) -> impl Iterator<Item = Move> + 'a {
         let player = usize::from(player);
         debug_assert!(
             self.player_pieces[player].contains(piece),
@@ -131,15 +158,12 @@ impl<'game> State<'game> {
                             .and(&piece_transform.neighbor_mask, (*cx - 1, *cy - 1))
                             .empty()
                     })
-                    .map(move |(cx, cy)| (tid, (cx as usize, cy as usize)))
+                    .map(move |(cx, cy)| Move::new(tid, (cx as usize, cy as usize)))
             })
     }
 
     /// Get the possible moves for a player
-    pub fn get_moves<'a>(
-        &'a self,
-        player: &'a Player,
-    ) -> impl Iterator<Item = (PieceTransformID, (usize, usize))> + 'a {
+    pub fn get_moves<'a>(&'a self, player: &'a Player) -> impl Iterator<Item = Move> + 'a {
         // All the different piece transforms for the player
         self.player_pieces[usize::from(player)]
             .iter()
@@ -147,7 +171,9 @@ impl<'game> State<'game> {
     }
 
     /// Place a piece on the board
-    pub fn place_piece(&mut self, player: &Player, piece: PieceTransformID, pos: (usize, usize)) {
+    pub fn place_piece(&mut self, player: &Player, mv: &Move) {
+        let Move { piece, pos } = *mv;
+
         let transformed_piece =
             &self.pieces[usize::from(player)][usize::from(piece.piece)].versions[piece.version];
 
@@ -163,7 +189,7 @@ impl<'game> State<'game> {
         debug_assert!(
             self.corners[usize::from(player)]
                 .iter()
-                .all(|corners| corners.contains(&(x, y))),
+                .any(|corners| corners.contains(&(x, y))),
             "Piece was not in a corner."
         );
 
@@ -175,6 +201,13 @@ impl<'game> State<'game> {
 
         // Update the corners
         for (x, y, v) in transformed_piece.tile_iter() {
+            let x = x + pos.0 as i32;
+            let y = y + pos.1 as i32;
+            if x < 0 || y < 0 {
+                continue;
+            }
+            let x = x as usize;
+            let y = y as usize;
             match v {
                 0b1111 => {
                     for cornerset in self.corners.iter_mut() {
@@ -206,7 +239,7 @@ impl Dimensioned for State<'_> {
     }
 }
 
-impl Debug for State<'_> {
+impl Display for State<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for row in 0..self.h() {
             for col in 0..self.w() {
@@ -230,6 +263,16 @@ impl Debug for State<'_> {
             }
             writeln!(f)?;
         }
+
+        Ok(())
+    }
+}
+
+impl Debug for State<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)?;
+
+        writeln!(f, "Corners: {:?}", self.corners)?;
 
         Ok(())
     }

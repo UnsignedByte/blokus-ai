@@ -133,7 +133,6 @@ impl TransformedPiece {
             }
         }
 
-        let neighbor_mask = Mask::new(mask.w(), vec![0; mask.h()]);
         Self {
             neighbor_mask,
             corners,
@@ -141,12 +140,13 @@ impl TransformedPiece {
     }
 
     /// Iterate over all non-empty cells in the neighbor mask
-    pub fn tile_iter(&self) -> impl Iterator<Item = (usize, usize, u128)> + '_ {
+    /// Returns x, y relative to the top left corner of the piece
+    pub fn tile_iter(&self) -> impl Iterator<Item = (i32, i32, u128)> + '_ {
         (0..self.neighbor_mask.w()).flat_map(move |x| {
             (0..self.neighbor_mask.h()).filter_map(move |y| {
                 let v = self.neighbor_mask.get(x, y).unwrap();
                 if v != 0 {
-                    Some((x, y, v))
+                    Some((x as i32 - 1, y as i32 - 1, v))
                 } else {
                     None
                 }

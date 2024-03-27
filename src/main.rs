@@ -1,5 +1,6 @@
-use blokus_ai::game::{Mask, Piece, State};
+use blokus_ai::game::{Mask, Piece, Player, State};
 use once_cell::sync::Lazy;
+use rand::seq::SliceRandom;
 
 static PIECES: Lazy<[Vec<Piece>; 4]> = Lazy::new(|| {
     let blocks = vec![
@@ -65,7 +66,32 @@ static PIECES: Lazy<[Vec<Piece>; 4]> = Lazy::new(|| {
 });
 
 fn main() {
-    let game = State::new(20, 20, &PIECES);
+    let mut game = State::new(20, 20, &PIECES);
 
-    println!("{:?}", game)
+    let mut rng = rand::thread_rng();
+
+    loop {
+        let mut played = false;
+        for player in Player::iter() {
+            // Choose a random move
+            let moves: Vec<_> = game.get_moves(&player).collect();
+
+            println!("Player {} has {} moves", player, moves.len());
+
+            if moves.is_empty() {
+                continue;
+            }
+
+            // Choose a random move
+            let move_ = moves.choose(&mut rng).unwrap();
+
+            game.place_piece(&player, move_);
+            println!("{:?}", game);
+            played = true;
+        }
+
+        if !played {
+            break;
+        }
+    }
 }
