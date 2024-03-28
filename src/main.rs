@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use blokus_ai::game::{Mask, Piece, Player, State};
 use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
@@ -66,32 +68,57 @@ static PIECES: Lazy<[Vec<Piece>; 4]> = Lazy::new(|| {
 });
 
 fn main() {
-    let mut game = State::new(20, 20, &PIECES);
-
     let mut rng = rand::thread_rng();
 
+    let mut avg_t = 0u128;
+    let mut avg_fanout = 0usize;
+
+    let mut turns = 0u32;
+
     loop {
-        let mut played = false;
-        for player in Player::iter() {
-            // Choose a random move
-            let moves: Vec<_> = game.get_moves(&player).collect();
+        let mut game = State::new(20, 20, &PIECES);
 
-            println!("Player {} has {} moves", player, moves.len());
+        loop {
+            let mut played = false;
+            for player in Player::iter() {
+                let now = Instant::now();
+                let moves: Vec<_> = game.get_moves(&player).collect();
+                let elapsed = now.elapsed();
+                avg_t += elapsed.as_nanos();
 
-            if moves.is_empty() {
-                continue;
+                // println!("Calculation took {} ns", elapsed.as_nanos());
+                // println!("Player {} has {} moves", player, moves.len());
+                avg_fanout += moves.len();
+
+                if moves.is_empty() {
+                    continue;
+                }
+
+                // Choose a random move
+                let move_ = moves.choose(&mut rng).unwrap();
+
+                game.place_piece(&player, move_);
+                // println!("{:?}", game);
+                played = true;
+
+                turns += 1;
             }
 
-            // Choose a random move
-            let move_ = moves.choose(&mut rng).unwrap();
-
-            game.place_piece(&player, move_);
-            println!("{:?}", game);
-            played = true;
+            if !played {
+                break;
+            }
         }
 
-        if !played {
-            break;
-        }
+        println!(
+            "Average time: {} ns = {} millis",
+            avg_t as f64 / turns as f64,
+            avg_t as f64 / turns as f64 / 1000000.
+        );
+
+        println!(
+            "Average fanout: {} over {} turns",
+            avg_fanout as f64 / turns as f64,
+            turns
+        );
     }
 }

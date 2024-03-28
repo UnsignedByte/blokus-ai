@@ -1,7 +1,4 @@
-use std::{
-    fmt::{Debug, Display},
-    ops::Add,
-};
+use std::{fmt::Display, ops::Add};
 
 use ansi_term::Color;
 

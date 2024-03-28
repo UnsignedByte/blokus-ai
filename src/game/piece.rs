@@ -1,8 +1,7 @@
-use std::{collections::HashSet, fmt::Debug, hash::Hash};
-
-use crate::game::{Corner, Dimensioned, Neighbor};
-
 use super::Mask;
+use crate::game::{Corner, Dimensioned, Neighbor};
+use rustc_hash::FxHashSet;
+use std::{fmt::Debug, hash::Hash};
 
 #[derive(Clone, Hash)]
 /// Represents the rotation of a piece.
@@ -202,7 +201,7 @@ impl Piece {
     pub fn new(mask: Mask) -> Self {
         let versions: Vec<_> = Transformation::iter()
             .map(|transformation| TransformedPiece::new(transform(transformation, &mask)))
-            .collect::<HashSet<TransformedPiece>>()
+            .collect::<FxHashSet<TransformedPiece>>()
             .into_iter()
             .collect();
 

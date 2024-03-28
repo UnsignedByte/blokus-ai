@@ -150,6 +150,32 @@ impl Mask {
         mask
     }
 
+    /// Check if two masks don't overlap
+    pub fn no_overlap(&self, other: &Mask, pos: (i32, i32)) -> bool {
+        let (x, y) = pos;
+        debug_assert!(x < self.w() as i32);
+        debug_assert!(y < self.h() as i32);
+        // number of rows to check
+        let num_rows = min(other.h(), (self.h() as i32 - y) as usize);
+
+        let other_y = max(-y, 0) as usize;
+        let y = max(y, 0) as usize;
+
+        let num_rows = num_rows - other_y;
+
+        // zip the two masks together
+        self.mask
+            .iter()
+            .skip(y)
+            .take(num_rows)
+            .zip(other.mask.iter().skip(other_y).map(
+                |row| shift(*row, x * 4), // shift the row to the right position
+            ))
+            // rows are zipped together now
+            .map(|(row1, row2)| row1 & row2)
+            .all(|x| x == 0)
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &'_ u128> {
         self.mask.iter()
     }

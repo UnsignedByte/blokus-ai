@@ -6,10 +6,8 @@ use crate::game::Dimensioned;
 
 use super::{utils::Player, Corner, Mask, Piece};
 use core::panic;
-use std::{
-    collections::HashSet,
-    fmt::{Debug, Display},
-};
+use rustc_hash::FxHashSet;
+use std::fmt::{Debug, Display};
 
 static NEIGHBOR_MASKS: Lazy<[Mask; 4]> = Lazy::new(|| {
     [
@@ -50,7 +48,7 @@ impl Debug for PieceID {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 /// A piece transform ID.
 pub struct PieceTransformID {
     piece: PieceID,
@@ -95,17 +93,17 @@ pub struct State<'game> {
     board: Mask,
     /// Corners for every player
     /// separated by corner direction
-    corners: [[HashSet<(usize, usize)>; Corner::N]; Player::N],
+    corners: [[FxHashSet<(usize, usize)>; Corner::N]; Player::N],
     /// Playable pieces for every player
-    player_pieces: [HashSet<PieceID>; Player::N],
+    player_pieces: [Vec<bool>; Player::N],
     /// All pieces for every player
     pieces: &'game [Vec<Piece>; Player::N],
 }
 
 impl<'game> State<'game> {
     pub fn new(w: usize, h: usize, pieces: &'game [Vec<Piece>; Player::N]) -> Self {
-        let mut corners: [[HashSet<(usize, usize)>; Corner::N]; Player::N] =
-            std::array::from_fn(|_| std::array::from_fn(|_| HashSet::new()));
+        let mut corners: [[FxHashSet<(usize, usize)>; Corner::N]; Player::N] =
+            std::array::from_fn(|_| std::array::from_fn(|_| FxHashSet::default()));
 
         // First player starts at the (0, 0) corner
         corners[usize::from(Player::Player1)][Corner::PosPos as usize].insert((0, 0));
@@ -116,8 +114,7 @@ impl<'game> State<'game> {
         // Fourth player starts at the (0, h - 1) corner
         corners[usize::from(Player::Player4)][Corner::PosNeg as usize].insert((0, h - 1));
 
-        let player_pieces =
-            std::array::from_fn(|i| (0..pieces[i].len()).map(PieceID::from).collect());
+        let player_pieces = std::array::from_fn(|i| vec![true; pieces[i].len()]);
 
         Self {
             board: Mask::new(w, vec![0; h]),
@@ -130,11 +127,11 @@ impl<'game> State<'game> {
     fn get_moves_for_piece<'a>(
         &'a self,
         player: &Player,
-        piece: &'a PieceID,
+        piece: PieceID,
     ) -> impl Iterator<Item = Move> + 'a {
         let player = usize::from(player);
         debug_assert!(
-            self.player_pieces[player].contains(piece),
+            self.player_pieces[player][usize::from(piece)],
             "Attempted to play a piece that the player doesn't have."
         );
 
@@ -143,9 +140,7 @@ impl<'game> State<'game> {
             .iter()
             .enumerate()
             .flat_map(move |(tid, piece_transform)| {
-                let tid = PieceTransformID::new(piece, tid);
-
-                // println!("Piece: {:?}", piece_transform);
+                let tid = PieceTransformID::new(&piece, tid);
 
                 // Set of possible moves to try
                 self.corners[player]
@@ -160,18 +155,10 @@ impl<'game> State<'game> {
                         )
                     })
                     // Map to the top left corner positions of the transformed piece
-                    .map(|((x, y), (dx, dy))| {
-                        // println!("{:?}", ((x, y), (dx, dy)));
-                        (x as i32 - dx as i32, y as i32 - dy as i32)
-                    })
+                    .map(|((x, y), (dx, dy))| (x as i32 - dx as i32, y as i32 - dy as i32))
                     .unique()
                     // Filter out moves that are out of bounds
                     .filter(|(cx, cy)| {
-                        // println!(
-                        //     "{:?}, {:?}",
-                        //     (cx, cy),
-                        //     (piece_transform.w(), piece_transform.h())
-                        // );
                         *cx >= 0
                             && *cy >= 0
                             && (*cx + piece_transform.w() as i32) <= self.w() as i32
@@ -180,20 +167,10 @@ impl<'game> State<'game> {
                     // Filter out moves that are in invalid positions
                     // I.E. have neighbors of the same color
                     .filter(|(cx, cy)| {
-                        // println!("Passed: {:?}", (cx, cy));
-                        // println!(
-                        //     "Mask: {:?}",
-                        //     self.board
-                        //         .and(&piece_transform.neighbor_mask, (*cx - 1, *cy - 1))
-                        // );
                         self.board
-                            .and(&piece_transform.neighbor_mask, (*cx - 1, *cy - 1))
-                            .empty()
+                            .no_overlap(&piece_transform.neighbor_mask, (*cx - 1, *cy - 1))
                     })
-                    .map(move |(cx, cy)| {
-                        // println!("Move: {:?}", (cx, cy));
-                        Move::new(tid, (cx as usize, cy as usize))
-                    })
+                    .map(move |(cx, cy)| Move::new(tid, (cx as usize, cy as usize)))
             })
     }
 
@@ -202,7 +179,9 @@ impl<'game> State<'game> {
         // All the different piece transforms for the player
         self.player_pieces[usize::from(player)]
             .iter()
-            .flat_map(move |piece| self.get_moves_for_piece(player, piece))
+            .enumerate()
+            .filter(|(_, v)| **v)
+            .flat_map(move |(piece, _)| self.get_moves_for_piece(player, PieceID::from(piece)))
     }
 
     /// Place a piece on the board
@@ -216,19 +195,17 @@ impl<'game> State<'game> {
 
         // Check if the piece can be placed
         debug_assert!(
-            self.board
-                .and(
-                    &transformed_piece.neighbor_mask,
-                    (x as i32 - 1, y as i32 - 1)
-                )
-                .empty(),
+            self.board.no_overlap(
+                &transformed_piece.neighbor_mask,
+                (x as i32 - 1, y as i32 - 1)
+            ),
             "Position already contained filled tiles."
         );
 
         // Place the piece on the board
         self.board = self.board.or(&transformed_piece.mask, (x as i32, y as i32));
         // Remove the piece from the player's pieces
-        self.player_pieces[usize::from(player)].remove(&piece.piece);
+        self.player_pieces[usize::from(player)][usize::from(piece.piece)] = false;
 
         // Update the corners
         for (x, y, v) in transformed_piece.tile_iter() {
@@ -326,8 +303,6 @@ impl Display for State<'_> {
 impl Debug for State<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)?;
-
-        writeln!(f, "Corners: {:?}", self.corners)?;
 
         Ok(())
     }
