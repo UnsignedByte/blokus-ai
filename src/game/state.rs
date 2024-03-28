@@ -18,7 +18,7 @@ static NEIGHBOR_MASKS: Lazy<[Mask; 4]> = Lazy::new(|| {
     ]
 });
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 /// A piece ID.
 pub struct PieceID {
     piece: usize,
@@ -48,11 +48,11 @@ impl Debug for PieceID {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 /// A piece transform ID.
 pub struct PieceTransformID {
-    piece: PieceID,
-    version: usize,
+    pub piece: PieceID,
+    pub version: usize,
 }
 
 impl PieceTransformID {
@@ -65,9 +65,10 @@ impl PieceTransformID {
 }
 
 /// A move.
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Move {
-    piece: PieceTransformID,
-    pos: (usize, usize),
+    pub piece: PieceTransformID,
+    pub pos: (usize, usize),
 }
 
 impl Move {
@@ -156,7 +157,6 @@ impl<'game> State<'game> {
                     })
                     // Map to the top left corner positions of the transformed piece
                     .map(|((x, y), (dx, dy))| (x as i32 - dx as i32, y as i32 - dy as i32))
-                    .unique()
                     // Filter out moves that are out of bounds
                     .filter(|(cx, cy)| {
                         *cx >= 0
