@@ -1,4 +1,4 @@
-use std::{collections::HashSet, hash::Hash};
+use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
 use crate::game::{Corner, Dimensioned, Neighbor};
 
@@ -82,6 +82,8 @@ fn transform(transformation: Transformation, mask: &Mask) -> Mask {
 
 /// Transformed piece.
 pub struct TransformedPiece {
+    /// The mask of the piece.
+    pub mask: Mask,
     /// Mask representing the neighbors of the piece
     /// in the board.
     /// If the piece looks like
@@ -134,6 +136,7 @@ impl TransformedPiece {
         }
 
         Self {
+            mask,
             neighbor_mask,
             corners,
         }
@@ -159,29 +162,35 @@ impl Dimensioned for TransformedPiece {
     #[inline]
     /// Get the width of the mask
     fn w(&self) -> usize {
-        self.neighbor_mask.w() - 2
+        self.mask.w()
     }
 
     #[inline]
     /// Get the height of the mask
     fn h(&self) -> usize {
-        self.neighbor_mask.h() - 2
+        self.mask.h()
     }
 }
 
 impl Hash for TransformedPiece {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.neighbor_mask.hash(state);
+        self.mask.hash(state);
     }
 }
 
 impl PartialEq for TransformedPiece {
     fn eq(&self, other: &Self) -> bool {
-        self.neighbor_mask == other.neighbor_mask
+        self.mask == other.mask
     }
 }
 
 impl Eq for TransformedPiece {}
+
+impl Debug for TransformedPiece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.mask, f)
+    }
+}
 
 /// A piece in the game.
 pub struct Piece {
@@ -273,5 +282,86 @@ mod tests {
         let mask = Mask::new(3, vec![0x100, 0x111]);
         let piece = Piece::new(mask);
         assert_eq!(piece.versions.len(), 8);
+    }
+
+    fn eq_orderless<T>(a: &[T], b: &[T])
+    where
+        T: Eq + Ord + Debug + Clone,
+    {
+        let mut a = a.to_owned();
+        let mut b = b.to_owned();
+        a.sort();
+        b.sort();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_transformed_pieces() {
+        let mask = Mask::new(2, vec![0x01, 0x11]);
+        let transformed_piece = TransformedPiece::new(mask);
+
+        const REPEAT: Vec<(usize, usize)> = Vec::new();
+        let mut expected_corners = [REPEAT; Corner::N];
+        // Pos Pos corners are here:
+        //  01
+        //  X1
+        expected_corners[Corner::PosPos as usize].extend(vec![(1, 1)]);
+        // Neg Pos corners are here:
+        //  01
+        //  1X
+        expected_corners[Corner::NegPos as usize].extend(vec![(0, 1)]);
+        // Pos Neg corners are here:
+        //  0X
+        //  X1
+        expected_corners[Corner::PosNeg as usize].extend(vec![(0, 0), (1, 1)]);
+
+        // Neg Neg corners are here:
+        //  0X
+        //  11
+        expected_corners[Corner::NegNeg as usize].extend(vec![(0, 0)]);
+
+        for (corner, expected) in transformed_piece
+            .corners
+            .iter()
+            .zip(expected_corners.iter())
+        {
+            eq_orderless(corner, expected);
+        }
+
+        let mask = Mask::new(3, vec![0x010, 0x111, 0x010]);
+        let transformed_piece = TransformedPiece::new(mask);
+
+        let mut expected_corners = [REPEAT; Corner::N];
+        // Pos Pos corners are here:
+        //  010
+        //  X11
+        //  0X0
+        expected_corners[Corner::PosPos as usize].extend(vec![(2, 1), (1, 2)]);
+
+        // Neg Pos corners are here:
+        //  010
+        //  11X
+        //  0X0
+        expected_corners[Corner::NegPos as usize].extend(vec![(0, 1), (1, 2)]);
+
+        // Pos Neg corners are here:
+        //  0X0
+        //  X11
+        //  010
+        expected_corners[Corner::PosNeg as usize].extend(vec![(1, 0), (2, 1)]);
+
+        // Neg Neg corners are here:
+        //  0X0
+        //  11X
+        //  010
+        expected_corners[Corner::NegNeg as usize].extend(vec![(1, 0), (0, 1)]);
+
+        for (corner, expected) in transformed_piece
+            .corners
+            .iter()
+            .zip(expected_corners.iter())
+        {
+            eq_orderless(corner, expected);
+        }
     }
 }

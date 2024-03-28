@@ -1,5 +1,6 @@
 use ansi_term::Color;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 
 use crate::game::Dimensioned;
 
@@ -9,6 +10,15 @@ use std::{
     collections::HashSet,
     fmt::{Debug, Display},
 };
+
+static NEIGHBOR_MASKS: Lazy<[Mask; 4]> = Lazy::new(|| {
+    [
+        Mask::new(3, vec![0x010, 0x1f1, 0x010]),
+        Mask::new(3, vec![0x020, 0x2f2, 0x020]),
+        Mask::new(3, vec![0x040, 0x4f4, 0x040]),
+        Mask::new(3, vec![0x080, 0x8f8, 0x080]),
+    ]
+});
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 /// A piece ID.
@@ -31,6 +41,12 @@ impl From<PieceID> for usize {
 impl From<&PieceID> for usize {
     fn from(piece: &PieceID) -> Self {
         piece.piece
+    }
+}
+
+impl Debug for PieceID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.piece)
     }
 }
 
@@ -92,13 +108,13 @@ impl<'game> State<'game> {
             std::array::from_fn(|_| std::array::from_fn(|_| HashSet::new()));
 
         // First player starts at the (0, 0) corner
-        corners[0][Corner::PosPos as usize].insert((0, 0));
+        corners[usize::from(Player::Player1)][Corner::PosPos as usize].insert((0, 0));
         // Second player starts at the (w - 1, 0) corner
-        corners[1][Corner::NegPos as usize].insert((w - 1, 0));
+        corners[usize::from(Player::Player2)][Corner::NegPos as usize].insert((w - 1, 0));
         // Third player starts at the (w - 1, h - 1) corner
-        corners[2][Corner::NegNeg as usize].insert((w - 1, h - 1));
+        corners[usize::from(Player::Player3)][Corner::NegNeg as usize].insert((w - 1, h - 1));
         // Fourth player starts at the (0, h - 1) corner
-        corners[3][Corner::PosNeg as usize].insert((0, h - 1));
+        corners[usize::from(Player::Player4)][Corner::PosNeg as usize].insert((0, h - 1));
 
         let player_pieces =
             std::array::from_fn(|i| (0..pieces[i].len()).map(PieceID::from).collect());
@@ -129,6 +145,8 @@ impl<'game> State<'game> {
             .flat_map(move |(tid, piece_transform)| {
                 let tid = PieceTransformID::new(piece, tid);
 
+                // println!("Piece: {:?}", piece_transform);
+
                 // Set of possible moves to try
                 self.corners[player]
                     .iter()
@@ -142,23 +160,40 @@ impl<'game> State<'game> {
                         )
                     })
                     // Map to the top left corner positions of the transformed piece
-                    .map(|((x, y), (dx, dy))| (x as i32 - dx as i32, y as i32 - dy as i32))
+                    .map(|((x, y), (dx, dy))| {
+                        // println!("{:?}", ((x, y), (dx, dy)));
+                        (x as i32 - dx as i32, y as i32 - dy as i32)
+                    })
                     .unique()
                     // Filter out moves that are out of bounds
                     .filter(|(cx, cy)| {
+                        // println!(
+                        //     "{:?}, {:?}",
+                        //     (cx, cy),
+                        //     (piece_transform.w(), piece_transform.h())
+                        // );
                         *cx >= 0
                             && *cy >= 0
-                            && (*cx + piece_transform.w() as i32) < self.w() as i32
-                            && (*cy + piece_transform.h() as i32) < self.h() as i32
+                            && (*cx + piece_transform.w() as i32) <= self.w() as i32
+                            && (*cy + piece_transform.h() as i32) <= self.h() as i32
                     })
                     // Filter out moves that are in invalid positions
                     // I.E. have neighbors of the same color
                     .filter(|(cx, cy)| {
+                        // println!("Passed: {:?}", (cx, cy));
+                        // println!(
+                        //     "Mask: {:?}",
+                        //     self.board
+                        //         .and(&piece_transform.neighbor_mask, (*cx - 1, *cy - 1))
+                        // );
                         self.board
                             .and(&piece_transform.neighbor_mask, (*cx - 1, *cy - 1))
                             .empty()
                     })
-                    .map(move |(cx, cy)| Move::new(tid, (cx as usize, cy as usize)))
+                    .map(move |(cx, cy)| {
+                        // println!("Move: {:?}", (cx, cy));
+                        Move::new(tid, (cx as usize, cy as usize))
+                    })
             })
     }
 
@@ -182,20 +217,16 @@ impl<'game> State<'game> {
         // Check if the piece can be placed
         debug_assert!(
             self.board
-                .and(&transformed_piece.neighbor_mask, (x as i32, y as i32))
+                .and(
+                    &transformed_piece.neighbor_mask,
+                    (x as i32 - 1, y as i32 - 1)
+                )
                 .empty(),
             "Position already contained filled tiles."
         );
-        debug_assert!(
-            self.corners[usize::from(player)]
-                .iter()
-                .any(|corners| corners.contains(&(x, y))),
-            "Piece was not in a corner."
-        );
 
         // Place the piece on the board
-        self.board
-            .or(&transformed_piece.neighbor_mask, (x as i32, y as i32));
+        self.board = self.board.or(&transformed_piece.mask, (x as i32, y as i32));
         // Remove the piece from the player's pieces
         self.player_pieces[usize::from(player)].remove(&piece.piece);
 
@@ -222,6 +253,30 @@ impl<'game> State<'game> {
                     }
                 }
                 _ => panic!("Invalid tile value"),
+            }
+        }
+
+        // add new corners
+        for (corner, corners) in transformed_piece.corners.iter().enumerate() {
+            let corner = Corner::from(corner);
+            for (x, y) in corners.iter().copied() {
+                let x = x + pos.0;
+                let y = y + pos.1;
+                let x = x as i32;
+                let y = y as i32;
+                let (x, y) = corner + (x, y);
+                if x >= 0
+                    && y >= 0
+                    && x < self.w() as i32
+                    && y < self.h() as i32
+                    && self
+                        .board
+                        .and(&NEIGHBOR_MASKS[usize::from(player)], (x - 1, y - 1))
+                        .empty()
+                {
+                    self.corners[usize::from(player)][usize::from(corner)]
+                        .insert((x as usize, y as usize));
+                }
             }
         }
     }
@@ -257,8 +312,8 @@ impl Display for State<'_> {
                     f,
                     "{}",
                     color
-                        .map(|color| color.paint("■"))
-                        .unwrap_or_else(|| "□".into())
+                        .map(|color| color.paint(format!("{:x}", cell)))
+                        .unwrap_or_else(|| format!("{:x}", cell).into())
                 )?;
             }
             writeln!(f)?;
