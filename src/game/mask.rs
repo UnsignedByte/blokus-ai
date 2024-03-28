@@ -83,38 +83,6 @@ impl Mask {
         self.mask.iter().all(|&row| row == 0)
     }
 
-    /// Bitwise AND mask with another mask
-    /// at a specific position
-    pub fn and(&self, other: &Mask, pos: (i32, i32)) -> Mask {
-        let (x, y) = pos;
-        debug_assert!(x < self.w() as i32);
-        debug_assert!(y < self.h() as i32);
-        // number of rows to check
-        let num_rows = min(other.h(), (self.h() as i32 - y) as usize);
-
-        let other_y = max(-y, 0) as usize;
-        let y = max(y, 0) as usize;
-
-        let num_rows = num_rows - other_y;
-
-        let w = self.w();
-
-        // zip the two masks together
-        let mask = self
-            .mask
-            .iter()
-            .skip(y)
-            .take(num_rows)
-            .zip(other.mask.iter().skip(other_y).map(
-                |row| shift(*row, x * 4), // shift the row to the right position
-            ))
-            // rows are zipped together now
-            .map(|(row1, row2)| row1 & row2)
-            .collect();
-
-        Mask::new(w, mask)
-    }
-
     /// Bitwise or mask
     pub fn assign_or(&mut self, other: &Mask, pos: (i32, i32)) {
         let (x, y) = pos;
@@ -234,52 +202,28 @@ mod tests {
 
         let pos = (0, 0);
 
-        // 1000
-        // 0001
-        let and = mask1.and(&mask2, pos);
         // 1110
         // 0111
         let or = mask1.or(&mask2, pos);
 
-        assert_eq!(and.mask, vec![0x1000, 0x0001]);
         assert_eq!(or.mask, vec![0x1110, 0x0111]);
 
         let pos = (1, 0);
 
-        // 1000
-        // 0100
-        let and = mask1.and(&mask2, pos);
         // 1010
         // 0111
         let or = mask1.or(&mask2, pos);
 
-        assert_eq!(and.mask, vec![0x1000, 0x0100]);
         assert_eq!(or.mask, vec![0x1010, 0x0111]);
 
         // test negative y and x
 
         let pos = (-1, -1);
 
-        // 0000
-        // 0000
-        let and = mask1.and(&mask2, pos);
-
         // 1011
         // 0101
         let or = mask1.or(&mask2, pos);
 
-        assert_eq!(and.mask, vec![0x000]);
         assert_eq!(or.mask, vec![0x1011, 0x0101]);
-    }
-
-    fn test_big_mask() {
-        // 1001
-        // 0110
-        let mask1 = Mask::new(4, vec![0x1001, 0110]);
-        // 1
-        let mask2 = Mask::new(1, vec![0x1]);
-
-        assert_eq!(mask1.and(&mask2, (0, 0)).mask, vec![0x1]);
-        assert_eq!(mask1.and(&mask2, (0, 1)).mask, vec![0x0, 0x0]);
     }
 }

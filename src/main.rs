@@ -87,6 +87,7 @@ fn main() {
                 pieces.fill(false);
                 let now = Instant::now();
                 let moves = game.get_moves(&player);
+                // faster way to filter only unique moves
                 let moves = moves.filter(|m| {
                     let piece = usize::from(m.piece.piece);
                     let ver = m.piece.version;

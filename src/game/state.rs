@@ -248,8 +248,7 @@ impl<'game> State<'game> {
                     && y < self.h() as i32
                     && self
                         .board
-                        .and(&NEIGHBOR_MASKS[usize::from(player)], (x - 1, y - 1))
-                        .empty()
+                        .no_overlap(&NEIGHBOR_MASKS[usize::from(player)], (x - 1, y - 1))
                 {
                     self.corners[usize::from(player)][usize::from(corner)]
                         .insert((x as usize, y as usize));
