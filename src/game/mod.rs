@@ -1,9 +1,13 @@
-mod mask;
-mod piece;
-mod state;
 mod utils;
+#[cfg(not(target_arch = "x86_64"))]
+mod ver_other;
+#[cfg(target_arch = "x86_64")]
+mod ver_x86;
 
-pub use mask::Mask;
-pub use piece::{Piece, TransformedPiece};
-pub use state::{Move, State};
+#[cfg(not(target_arch = "x86_64"))]
+pub use ver_other::*;
+
+#[cfg(target_arch = "x86_64")]
+pub use ver_x86::*;
+
 pub use utils::{Corner, Dimensioned, Neighbor, Player};
