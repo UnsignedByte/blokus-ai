@@ -1,11 +1,12 @@
+use super::{Mask, Piece};
+use crate::game::{
+    utils::{PieceID, PieceTransformID},
+    Corner, Dimensioned, Player,
+};
 use ansi_term::Color;
+use core::panic;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-
-use crate::game::Dimensioned;
-
-use super::{utils::Player, Corner, Mask, Piece};
-use core::panic;
 use rustc_hash::FxHashSet;
 use std::fmt::{Debug, Display};
 
@@ -18,72 +19,89 @@ static NEIGHBOR_MASKS: Lazy<[Mask; 4]> = Lazy::new(|| {
     ]
 });
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-/// A piece ID.
-pub struct PieceID {
-    piece: usize,
-}
+pub static PIECES: Lazy<[Vec<Piece>; 4]> = Lazy::new(|| {
+    let blocks = vec![
+        // 1 tile
+        Mask::new(1, vec![0x1]),
+        // 2 tiles
+        Mask::new(2, vec![0x11]),
+        // 3 tiles
+        Mask::new(2, vec![0x11, 0x01]),
+        Mask::new(3, vec![0x111]),
+        // 4 tiles
+        Mask::new(4, vec![0x1111]),
+        Mask::new(3, vec![0x111, 0x001]),
+        Mask::new(3, vec![0x110, 0x011]),
+        Mask::new(2, vec![0x11, 0x11]),
+        Mask::new(3, vec![0x111, 0x010]),
+        // 5 tiles
+        Mask::new(3, vec![0x011, 0x110, 0x010]),
+        Mask::new(5, vec![0x11111]),
+        Mask::new(4, vec![0x1111, 0x1000]),
+        Mask::new(4, vec![0x0111, 0x1100]),
+        Mask::new(3, vec![0x111, 0x110]),
+        Mask::new(3, vec![0x111, 0x010, 0x010]),
+        Mask::new(3, vec![0x111, 0x101]),
+        Mask::new(3, vec![0x111, 0x100, 0x100]),
+        Mask::new(3, vec![0x001, 0x011, 0x110]),
+        Mask::new(3, vec![0x010, 0x111, 0x010]),
+        Mask::new(4, vec![0x1111, 0x0100]),
+        Mask::new(3, vec![0x110, 0x010, 0x011]),
+    ];
 
-impl From<usize> for PieceID {
-    fn from(piece: usize) -> Self {
-        Self { piece }
-    }
-}
+    // Uses a hack to generate the pieces for all 4 players.
+    // Given a piece that looks like
+    // 010
+    // 111
+    // for example, note that shifting each row to the left by one
+    // gives the piece
+    // 020
+    // 222
+    // which is the same piece for player 2.
+    // This is done for all 4 players.
 
-impl From<PieceID> for usize {
-    fn from(piece: PieceID) -> Self {
-        piece.piece
-    }
-}
-
-impl From<&PieceID> for usize {
-    fn from(piece: &PieceID) -> Self {
-        piece.piece
-    }
-}
-
-impl Debug for PieceID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.piece)
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-/// A piece transform ID.
-pub struct PieceTransformID {
-    pub piece: PieceID,
-    pub version: usize,
-}
-
-impl PieceTransformID {
-    pub fn new(piece: &PieceID, version: usize) -> Self {
-        Self {
-            piece: *piece,
-            version,
-        }
-    }
-}
+    [
+        blocks.clone().into_iter().map(Piece::new).collect(),
+        blocks
+            .clone()
+            .into_iter()
+            .map(|block| block << 1)
+            .map(Piece::new)
+            .collect(),
+        blocks
+            .clone()
+            .into_iter()
+            .map(|block| block << 2)
+            .map(Piece::new)
+            .collect(),
+        blocks
+            .into_iter()
+            .map(|block| block << 3)
+            .map(Piece::new)
+            .collect(),
+    ]
+});
 
 /// A move.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Move {
     pub piece: PieceTransformID,
-    pub pos: (usize, usize),
+    pub pos: (i8, i8),
 }
 
 impl Move {
-    pub fn new(piece: PieceTransformID, pos: (usize, usize)) -> Self {
+    pub fn new(piece: PieceTransformID, pos: (i8, i8)) -> Self {
         Self { piece, pos }
     }
 }
 
-impl From<(PieceTransformID, (usize, usize))> for Move {
-    fn from((piece, pos): (PieceTransformID, (usize, usize))) -> Self {
+impl From<(PieceTransformID, (i8, i8))> for Move {
+    fn from((piece, pos): (PieceTransformID, (i8, i8))) -> Self {
         Self { piece, pos }
     }
 }
 
-impl From<Move> for (PieceTransformID, (usize, usize)) {
+impl From<Move> for (PieceTransformID, (i8, i8)) {
     fn from(m: Move) -> Self {
         (m.piece, m.pos)
     }
@@ -94,7 +112,7 @@ pub struct State<'game> {
     board: Mask,
     /// Corners for every player
     /// separated by corner direction
-    corners: [[FxHashSet<(usize, usize)>; Corner::N]; Player::N],
+    corners: [[FxHashSet<(i8, i8)>; Corner::N]; Player::N],
     /// Playable pieces for every player
     player_pieces: [Vec<bool>; Player::N],
     /// All pieces for every player
@@ -102,8 +120,8 @@ pub struct State<'game> {
 }
 
 impl<'game> State<'game> {
-    pub fn new(w: usize, h: usize, pieces: &'game [Vec<Piece>; Player::N]) -> Self {
-        let mut corners: [[FxHashSet<(usize, usize)>; Corner::N]; Player::N] =
+    pub fn new(w: i8, h: i8, pieces: &'game [Vec<Piece>; Player::N]) -> Self {
+        let mut corners: [[FxHashSet<(i8, i8)>; Corner::N]; Player::N] =
             std::array::from_fn(|_| std::array::from_fn(|_| FxHashSet::default()));
 
         // First player starts at the (0, 0) corner
@@ -118,7 +136,7 @@ impl<'game> State<'game> {
         let player_pieces = std::array::from_fn(|i| vec![true; pieces[i].len()]);
 
         Self {
-            board: Mask::new(w, vec![0; h]),
+            board: Mask::new(w, vec![0; h as usize]),
             corners,
             pieces,
             player_pieces,
@@ -156,13 +174,13 @@ impl<'game> State<'game> {
                         )
                     })
                     // Map to the top left corner positions of the transformed piece
-                    .map(|((x, y), (dx, dy))| (x as i32 - dx as i32, y as i32 - dy as i32))
+                    .map(|((x, y), (dx, dy))| (x - dx, y - dy))
                     // Filter out moves that are out of bounds
                     .filter(|(cx, cy)| {
                         *cx >= 0
                             && *cy >= 0
-                            && (*cx + piece_transform.w() as i32) <= self.w() as i32
-                            && (*cy + piece_transform.h() as i32) <= self.h() as i32
+                            && (*cx + piece_transform.w()) <= self.w()
+                            && (*cy + piece_transform.h()) <= self.h()
                     })
                     // Filter out moves that are in invalid positions
                     // I.E. have neighbors of the same color
@@ -170,7 +188,7 @@ impl<'game> State<'game> {
                         self.board
                             .no_overlap(&piece_transform.neighbor_mask, (*cx - 1, *cy - 1))
                     })
-                    .map(move |(cx, cy)| Move::new(tid, (cx as usize, cy as usize)))
+                    .map(move |(cx, cy)| Move::new(tid, (cx, cy)))
             })
     }
 
@@ -195,27 +213,23 @@ impl<'game> State<'game> {
 
         // Check if the piece can be placed
         debug_assert!(
-            self.board.no_overlap(
-                &transformed_piece.neighbor_mask,
-                (x as i32 - 1, y as i32 - 1)
-            ),
+            self.board
+                .no_overlap(&transformed_piece.neighbor_mask, (x - 1, y - 1)),
             "Position already contained filled tiles."
         );
 
         // Place the piece on the board
-        self.board = self.board.or(&transformed_piece.mask, (x as i32, y as i32));
+        self.board = self.board.or(&transformed_piece.mask, (x, y));
         // Remove the piece from the player's pieces
         self.player_pieces[usize::from(player)][usize::from(piece.piece)] = false;
 
         // Update the corners
         for (x, y, v) in transformed_piece.tile_iter() {
-            let x = x + pos.0 as i32;
-            let y = y + pos.1 as i32;
+            let x = x + pos.0;
+            let y = y + pos.1;
             if x < 0 || y < 0 {
                 continue;
             }
-            let x = x as usize;
-            let y = y as usize;
             match v {
                 0b1111 => {
                     for cornerset in self.corners.iter_mut() {
@@ -239,19 +253,16 @@ impl<'game> State<'game> {
             for (x, y) in corners.iter().copied() {
                 let x = x + pos.0;
                 let y = y + pos.1;
-                let x = x as i32;
-                let y = y as i32;
                 let (x, y) = corner + (x, y);
                 if x >= 0
                     && y >= 0
-                    && x < self.w() as i32
-                    && y < self.h() as i32
+                    && x < self.w()
+                    && y < self.h()
                     && self
                         .board
                         .no_overlap(&NEIGHBOR_MASKS[usize::from(player)], (x - 1, y - 1))
                 {
-                    self.corners[usize::from(player)][usize::from(corner)]
-                        .insert((x as usize, y as usize));
+                    self.corners[usize::from(player)][usize::from(corner)].insert((x, y));
                 }
             }
         }
@@ -260,12 +271,12 @@ impl<'game> State<'game> {
 
 impl Dimensioned for State<'_> {
     #[inline]
-    fn w(&self) -> usize {
+    fn w(&self) -> i8 {
         self.board.w()
     }
 
     #[inline]
-    fn h(&self) -> usize {
+    fn h(&self) -> i8 {
         self.board.h()
     }
 }

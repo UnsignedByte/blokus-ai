@@ -1,6 +1,55 @@
-use std::{fmt::Display, ops::Add};
+use std::{
+    fmt::{Debug, Display},
+    ops::Add,
+};
 
 use ansi_term::Color;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// A piece ID.
+pub struct PieceID {
+    piece: usize,
+}
+
+impl From<usize> for PieceID {
+    fn from(piece: usize) -> Self {
+        Self { piece }
+    }
+}
+
+impl From<PieceID> for usize {
+    fn from(piece: PieceID) -> Self {
+        piece.piece
+    }
+}
+
+impl From<&PieceID> for usize {
+    fn from(piece: &PieceID) -> Self {
+        piece.piece
+    }
+}
+
+impl Debug for PieceID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.piece)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// A piece transform ID.
+pub struct PieceTransformID {
+    pub piece: PieceID,
+    pub version: usize,
+}
+
+impl PieceTransformID {
+    pub fn new(piece: &PieceID, version: usize) -> Self {
+        Self {
+            piece: *piece,
+            version,
+        }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 /// Corner direction mapping.
@@ -59,10 +108,10 @@ impl From<usize> for Corner {
     }
 }
 
-impl Add<(i32, i32)> for Corner {
-    type Output = (i32, i32);
+impl Add<(i8, i8)> for Corner {
+    type Output = (i8, i8);
 
-    fn add(self, (x, y): (i32, i32)) -> Self::Output {
+    fn add(self, (x, y): (i8, i8)) -> Self::Output {
         match self {
             Corner::PosPos => (x + 1, y + 1),
             Corner::NegPos => (x - 1, y + 1),
@@ -119,10 +168,10 @@ impl From<usize> for Neighbor {
     }
 }
 
-impl Add<(i32, i32)> for Neighbor {
-    type Output = (i32, i32);
+impl Add<(i8, i8)> for Neighbor {
+    type Output = (i8, i8);
 
-    fn add(self, (x, y): (i32, i32)) -> Self::Output {
+    fn add(self, (x, y): (i8, i8)) -> Self::Output {
         match self {
             Neighbor::_Pos => (x, y + 1),
             Neighbor::_Neg => (x, y - 1),
@@ -133,6 +182,7 @@ impl Add<(i32, i32)> for Neighbor {
 }
 
 /// Enum for every player.
+#[derive(Clone, Copy)]
 pub enum Player {
     Player1,
     Player2,
@@ -217,9 +267,47 @@ impl From<&Player> for usize {
     }
 }
 
+#[derive(Clone, Hash)]
+/// Represents the rotation of a piece.
+pub enum Rotation {
+    Zero,
+    Ninety,
+    OneEighty,
+    TwoSeventy,
+}
+
+#[derive(Clone, Hash)]
+/// Represents the reflection of a piece.
+pub enum Reflection {
+    Flip,
+    NoFlip,
+}
+
+#[derive(Clone, Hash)]
+/// A transformation
+pub struct Transformation(pub Rotation, pub Reflection);
+
+impl Transformation {
+    pub fn iter() -> impl Iterator<Item = Transformation> {
+        use Reflection::*;
+        use Rotation::*;
+        [
+            Transformation(Zero, NoFlip),
+            Transformation(Ninety, NoFlip),
+            Transformation(OneEighty, NoFlip),
+            Transformation(TwoSeventy, NoFlip),
+            Transformation(Zero, Flip),
+            Transformation(Ninety, Flip),
+            Transformation(OneEighty, Flip),
+            Transformation(TwoSeventy, Flip),
+        ]
+        .into_iter()
+    }
+}
+
 /// A trait for getting the dimensions of an object.
 pub trait Dimensioned {
-    fn w(&self) -> usize;
+    fn w(&self) -> i8;
 
-    fn h(&self) -> usize;
+    fn h(&self) -> i8;
 }

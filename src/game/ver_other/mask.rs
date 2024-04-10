@@ -3,10 +3,10 @@ use std::{
     ops::Shl,
 };
 
-use super::Dimensioned;
+use crate::game::Dimensioned;
 
 #[inline]
-fn shift(x: u128, y: i32) -> u128 {
+fn shift(x: u128, y: i8) -> u128 {
     if y < 0 {
         x >> -y
     } else {
@@ -25,7 +25,7 @@ fn shift(x: u128, y: i32) -> u128 {
 #[derive(Clone, PartialEq, Hash)]
 pub struct Mask {
     /// The width of the mask in cells
-    width: usize,
+    width: i8,
     /// The mask stored as a single bitslice
     /// flattened
     mask: Vec<u128>,
@@ -34,11 +34,7 @@ pub struct Mask {
 impl Mask {
     /// Generate a bitmask from a 2D array of bytes.
     /// Each byte represents a cell on the board.
-    pub fn new(width: usize, mask: Vec<u128>) -> Self {
-        // Each row can be at most 128 bits wide
-        // as it is stored as a single u128
-        debug_assert!(width * 4 <= 128);
-
+    pub fn new(width: i8, mask: Vec<u128>) -> Self {
         // Now, make sure every row is contained in the width
         // This is disabled as we are using a const function
         debug_assert!(mask.iter().all(|&row| row < (1 << (width * 4))));
@@ -47,35 +43,37 @@ impl Mask {
     }
 
     /// Set the value of a cell in the mask
-    pub fn set(&mut self, x: usize, y: usize, value: u128) {
+    pub fn set(&mut self, x: i8, y: i8, value: u128) {
         debug_assert!(x < self.w());
         debug_assert!(y < self.h());
-        self.mask[y] = self.mask[y] & !(0xF << (x * 4)) | (value << (x * 4));
+        self.mask[y as usize] = self.mask[y as usize] & !(0xF << (x * 4)) | (value << (x * 4));
     }
 
     /// Get the value of a cell in the mask
     /// Returns None if the position is out of bounds
-    pub fn get_i32(&self, x: i32, y: i32) -> Option<u128> {
+    #[inline]
+    pub fn get_i8(&self, x: i8, y: i8) -> Option<u128> {
         if x < 0 || y < 0 {
             return None;
         }
-        self.get(x as usize, y as usize)
+        self.get(x, y)
     }
 
     /// Get the value of a cell in the mask
     /// Returns None if the position is out of bounds
-    pub fn get(&self, x: usize, y: usize) -> Option<u128> {
+    #[inline]
+    pub fn get(&self, x: i8, y: i8) -> Option<u128> {
         if x >= self.w() || y >= self.h() {
             return None;
         }
-        Some(self.mask[y] >> (x * 4) & 0xF)
+        Some(self.mask[y as usize] >> (x * 4) & 0xF)
     }
 
     /// Set the value of a cell in the mask without checking if the position is empty
-    pub fn set_unchecked(&mut self, x: usize, y: usize, value: u128) {
+    pub fn set_unchecked(&mut self, x: i8, y: i8, value: u128) {
         debug_assert!(x < self.w());
         debug_assert!(y < self.h());
-        self.mask[y] |= value << (x * 4);
+        self.mask[y as usize] |= value << (x * 4);
     }
 
     /// Check if the mask is all zeros
@@ -84,12 +82,12 @@ impl Mask {
     }
 
     /// Bitwise or mask
-    pub fn assign_or(&mut self, other: &Mask, pos: (i32, i32)) {
+    pub fn assign_or(&mut self, other: &Mask, pos: (i8, i8)) {
         let (x, y) = pos;
-        debug_assert!(x < self.w() as i32);
-        debug_assert!(y < self.h() as i32);
+        debug_assert!(x < self.w());
+        debug_assert!(y < self.h());
         // number of rows to check
-        let num_rows = min(other.h(), (self.h() as i32 - y) as usize);
+        let num_rows = min(other.h(), self.h() - y) as usize;
 
         let other_y = max(-y, 0) as usize;
         let y = max(y, 0) as usize;
@@ -112,19 +110,19 @@ impl Mask {
 
     /// Bitwise OR mask with another mask
     /// at a specific position
-    pub fn or(&self, other: &Mask, pos: (i32, i32)) -> Mask {
+    pub fn or(&self, other: &Mask, pos: (i8, i8)) -> Mask {
         let mut mask = self.clone();
         mask.assign_or(other, pos);
         mask
     }
 
     /// Check if two masks don't overlap
-    pub fn no_overlap(&self, other: &Mask, pos: (i32, i32)) -> bool {
+    pub fn no_overlap(&self, other: &Mask, pos: (i8, i8)) -> bool {
         let (x, y) = pos;
-        debug_assert!(x < self.w() as i32);
-        debug_assert!(y < self.h() as i32);
+        debug_assert!(x < self.w());
+        debug_assert!(y < self.h());
         // number of rows to check
-        let num_rows = min(other.h(), (self.h() as i32 - y) as usize);
+        let num_rows = min(other.h(), self.h() - y) as usize;
 
         let other_y = max(-y, 0) as usize;
         let y = max(y, 0) as usize;
@@ -152,14 +150,14 @@ impl Mask {
 impl Dimensioned for Mask {
     #[inline]
     /// Get the width of the mask
-    fn w(&self) -> usize {
+    fn w(&self) -> i8 {
         self.width
     }
 
     #[inline]
     /// Get the height of the mask
-    fn h(&self) -> usize {
-        self.mask.len()
+    fn h(&self) -> i8 {
+        self.mask.len() as i8
     }
 }
 
@@ -175,7 +173,7 @@ impl Shl<usize> for Mask {
 impl std::fmt::Debug for Mask {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for row in &self.mask {
-            writeln!(f, "{:0width$x}", row, width = self.w())?;
+            writeln!(f, "{:0width$x}", row, width = self.w() as usize)?;
         }
         Ok(())
     }

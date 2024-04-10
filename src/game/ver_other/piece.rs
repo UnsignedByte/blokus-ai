@@ -1,51 +1,13 @@
 use super::Mask;
-use crate::game::{Corner, Dimensioned, Neighbor};
+use crate::game::{Corner, Dimensioned, Neighbor, Reflection, Rotation, Transformation};
 use rustc_hash::FxHashSet;
 use std::{fmt::Debug, hash::Hash};
-
-#[derive(Clone, Hash)]
-/// Represents the rotation of a piece.
-enum Rotation {
-    Zero,
-    Ninety,
-    OneEighty,
-    TwoSeventy,
-}
-
-#[derive(Clone, Hash)]
-/// Represents the reflection of a piece.
-enum Reflection {
-    Flip,
-    NoFlip,
-}
-
-#[derive(Clone, Hash)]
-/// A transformation
-struct Transformation(Rotation, Reflection);
-
-impl Transformation {
-    fn iter() -> impl Iterator<Item = Transformation> {
-        use Reflection::*;
-        use Rotation::*;
-        [
-            Transformation(Zero, NoFlip),
-            Transformation(Ninety, NoFlip),
-            Transformation(OneEighty, NoFlip),
-            Transformation(TwoSeventy, NoFlip),
-            Transformation(Zero, Flip),
-            Transformation(Ninety, Flip),
-            Transformation(OneEighty, Flip),
-            Transformation(TwoSeventy, Flip),
-        ]
-        .into_iter()
-    }
-}
 
 /// Rotate a mask by 90 degrees clockwise.
 fn rotate(mask: &Mask) -> Mask {
     let width = mask.w();
     let height = mask.h();
-    let mut new_mask = Mask::new(height, vec![0; width]);
+    let mut new_mask = Mask::new(height, vec![0; width as usize]);
     for i in 0..width {
         for j in 0..height {
             let bit = mask.get(i, j).unwrap();
@@ -95,15 +57,15 @@ pub struct TransformedPiece {
     ///   0110
     pub neighbor_mask: Mask,
     /// Corners of the pieces
-    pub corners: [Vec<(usize, usize)>; Corner::N],
+    pub corners: [Vec<(i8, i8)>; Corner::N],
 }
 
 impl TransformedPiece {
     pub fn new(mask: Mask) -> Self {
-        const EMPTY: Vec<(usize, usize)> = Vec::new();
+        const EMPTY: Vec<(i8, i8)> = Vec::new();
         let mut corners = [EMPTY; Corner::N];
 
-        let mut neighbor_mask = Mask::new(mask.w() + 2, vec![0; mask.h() + 2]);
+        let mut neighbor_mask = Mask::new(mask.w() + 2, vec![0; (mask.h() + 2) as usize]);
         for i in 0..mask.w() {
             for j in 0..mask.h() {
                 let cell = mask.get(i, j).unwrap();
@@ -114,20 +76,20 @@ impl TransformedPiece {
                 neighbor_mask.set_unchecked(i + 1, j + 1, 0xF);
                 // set the neighbors to the value of the cell
                 for neighbor in Neighbor::iter() {
-                    let (x, y) = neighbor + (i as i32, j as i32);
+                    let (x, y) = neighbor + (i, j);
 
-                    neighbor_mask.set_unchecked((x + 1) as usize, (y + 1) as usize, cell);
+                    neighbor_mask.set_unchecked(x + 1, y + 1, cell);
                 }
 
                 // Check if this is a corner for each direction
                 for corner in Corner::iter() {
-                    let (x, y) = corner + (i as i32, j as i32);
+                    let (x, y) = corner + (i, j);
 
-                    let neighbor1 = mask.get_i32(x, j as i32).unwrap_or(0);
-                    let neighbor2 = mask.get_i32(i as i32, y).unwrap_or(0);
+                    let neighbor1 = mask.get_i8(x, j).unwrap_or(0);
+                    let neighbor2 = mask.get_i8(i, y).unwrap_or(0);
 
                     if neighbor1 == 0 && neighbor2 == 0 {
-                        debug_assert!(mask.get_i32(x, y).unwrap_or(0) == 0);
+                        debug_assert!(mask.get_i8(x, y).unwrap_or(0) == 0);
                         corners[corner as usize].push((i, j));
                     }
                 }
@@ -143,12 +105,12 @@ impl TransformedPiece {
 
     /// Iterate over all non-empty cells in the neighbor mask
     /// Returns x, y relative to the top left corner of the piece
-    pub fn tile_iter(&self) -> impl Iterator<Item = (i32, i32, u128)> + '_ {
+    pub fn tile_iter(&self) -> impl Iterator<Item = (i8, i8, u128)> + '_ {
         (0..self.neighbor_mask.w()).flat_map(move |x| {
             (0..self.neighbor_mask.h()).filter_map(move |y| {
                 let v = self.neighbor_mask.get(x, y).unwrap();
                 if v != 0 {
-                    Some((x as i32 - 1, y as i32 - 1, v))
+                    Some((x - 1, y - 1, v))
                 } else {
                     None
                 }
@@ -160,13 +122,13 @@ impl TransformedPiece {
 impl Dimensioned for TransformedPiece {
     #[inline]
     /// Get the width of the mask
-    fn w(&self) -> usize {
+    fn w(&self) -> i8 {
         self.mask.w()
     }
 
     #[inline]
     /// Get the height of the mask
-    fn h(&self) -> usize {
+    fn h(&self) -> i8 {
         self.mask.h()
     }
 }
@@ -299,7 +261,7 @@ mod tests {
         let mask = Mask::new(2, vec![0x01, 0x11]);
         let transformed_piece = TransformedPiece::new(mask);
 
-        const REPEAT: Vec<(usize, usize)> = Vec::new();
+        const REPEAT: Vec<(i8, i8)> = Vec::new();
         let mut expected_corners = [REPEAT; Corner::N];
         // Pos Pos corners are here:
         //  01
