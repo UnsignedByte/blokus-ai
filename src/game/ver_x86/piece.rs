@@ -1,7 +1,5 @@
-use crate::game::{utils::PieceID, ver_x86::utils::ymm, Corner, Neighbor};
+use crate::game::{ver_x86::utils::ymm, Corner, Neighbor};
 use std::{arch::x86_64::*, fmt::Debug};
-
-const BOARD_SIZE: i8 = 20;
 
 /// Struct representing a piece
 /// All masks in this piece are stored as an __m256i, meaning
@@ -11,6 +9,11 @@ pub struct Piece {
     pub width: i8,
     /// Height of the piece
     pub height: i8,
+    /// ID mask of the piece,
+    /// contains 1s at all the indices of this piece
+    /// and its transformations
+    /// used to remove pieces from the player's hand
+    pub id_mask: u128,
     /// Bitmask of the piece
     pub occupied_mask: __m256i,
     // /// Say we have a piece that looks like
@@ -66,7 +69,7 @@ pub struct Piece {
 }
 
 impl Piece {
-    pub fn new(width: i8, height: i8, id: PieceID, mut piece: [u32; 8]) -> Self {
+    pub fn new(width: i8, height: i8, id_mask: u128, piece: [u32; 8]) -> Self {
         debug_assert!(width < 32);
         debug_assert!(height < 8);
         // Generate the neighbor mask
@@ -126,6 +129,7 @@ impl Piece {
 
         unsafe {
             Self {
+                id_mask,
                 width,
                 height,
                 occupied_mask: ymm(piece),
@@ -167,7 +171,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_occupied_mask() {
-        let piece = Piece::new(3, 3, PieceID::from(0), [0b110, 0b010, 0b011, 0, 0, 0, 0, 0]);
+        let piece = Piece::new(3, 3, 0, [0b110, 0b010, 0b011, 0, 0, 0, 0, 0]);
         println!("{:?}", piece);
 
         let expected = [0b110, 0b010, 0b011, 0, 0, 0, 0, 0];
@@ -195,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_neighbor_mask() {
-        let piece = Piece::new(3, 3, PieceID::from(0), [0b110, 0b010, 0b011, 0, 0, 0, 0, 0]);
+        let piece = Piece::new(3, 3, 0, [0b110, 0b010, 0b011, 0, 0, 0, 0, 0]);
         println!("{:?}", piece);
 
         let expected = [0b01100, 0b10010, 0b01010, 0b01001, 0b00110, 0, 0, 0];
