@@ -189,6 +189,8 @@ pub struct State {
     player_pieces: [u128; Player::N],
 }
 
+type Checker = (__m256i, __m256i, __m256i);
+
 impl State {
     pub fn new(w: usize, h: usize) -> Self {
         debug_assert!(w == 20 && h == 20);
@@ -252,24 +254,12 @@ impl State {
     /// If we have a "piece" stored with the same format in an __m256i, then
     /// none(piece & occupied) & some(piece & corners) means that the piece fits in those 8 rows
     #[inline]
-    fn get_checker(
-        &self,
-        player: &Player,
-        offset: usize,
-    ) -> (
-        __m256i, /* occupied */
-        __m256i,
-        /* corners */ __m256i, /* colors */
-    ) {
+    fn get_checker(&self, player: &Player, offset: usize) -> Checker {
         unsafe {
             (
+                // _mm256_or_si256(
                 _mm256_loadu_si256(
                     self.occupied_mask.as_ptr().wrapping_add(offset) as *const __m256i
-                ),
-                _mm256_loadu_si256(
-                    self.corner_masks[usize::from(player)]
-                        .as_ptr()
-                        .wrapping_add(offset) as *const __m256i,
                 ),
                 _mm256_loadu_si256(
                     self.color_masks[usize::from(player)]
@@ -277,23 +267,29 @@ impl State {
                         // This is moved back 1 because the neighbor mask is expanded
                         .wrapping_add(offset) as *const __m256i,
                 ),
+                // ),
+                _mm256_loadu_si256(
+                    self.corner_masks[usize::from(player)]
+                        .as_ptr()
+                        .wrapping_add(offset) as *const __m256i,
+                ),
             )
         }
     }
 
     #[inline]
-    fn check((occupied, corners, color): (__m256i, __m256i, __m256i), shape: __m256i) -> bool {
+    fn check((occupied, colors, corners): Checker, shape: __m256i) -> bool {
         unsafe {
-            // check if the neighbors mask is empty
+            // check if this is unoccupied
             // we want the result to be 0
-            _mm256_testz_si256(color, shape) != 0
+            _mm256_testz_si256(colors, shape) != 0 &&
             // check if its a valid corner
             // testz returns 0 if the result of the & is >0
             // and 1 if the result is 0
-            && _mm256_testz_si256(corners, shape) == 0
+            _mm256_testz_si256(corners, shape) == 0 &&
             // check if this is unoccupied
             // we want the result to be 0
-            && _mm256_testz_si256(occupied, shape) != 0
+            _mm256_testz_si256(occupied, shape) != 0
         }
     }
 
@@ -301,6 +297,7 @@ impl State {
         &self,
         moves: &mut Vec<Move>,
         pieces: &[Piece; PIECE_COUNT],
+        (check0to4, check4to8, check8to12, check12to16): (Checker, Checker, Checker, Checker),
         player: &Player,
         pieceid: usize,
     ) {
@@ -315,10 +312,6 @@ impl State {
             // Generate a checker for the first row in the gap
             // Rotate down by 1 and check again
             // repeat
-            let check0to4 = self.get_checker(player, 0);
-            let check4to8 = self.get_checker(player, 4);
-            let check8to12 = self.get_checker(player, 8);
-            let check12to16 = self.get_checker(player, 12);
 
             let mut shape = piece.occupied_mask;
 
@@ -361,12 +354,23 @@ impl State {
     /// Get the possible moves for a player
     pub fn get_moves<'a>(&'a self, player: &'a Player) -> Vec<Move> {
         let mut moves = Vec::with_capacity(1000);
+        let check0to4 = self.get_checker(player, 0);
+        let check4to8 = self.get_checker(player, 4);
+        let check8to12 = self.get_checker(player, 8);
+        let check12to16 = self.get_checker(player, 12);
+
         let pieces = &*PIECES;
         // All the different piece transforms for the player
         for piece in (0..PIECE_COUNT)
             .filter(move |f| (1 << *f) & self.player_pieces[usize::from(player)] != 0)
         {
-            self.get_moves_for_piece(&mut moves, pieces, player, piece);
+            self.get_moves_for_piece(
+                &mut moves,
+                pieces,
+                (check0to4, check4to8, check8to12, check12to16),
+                player,
+                piece,
+            );
         }
         moves
     }

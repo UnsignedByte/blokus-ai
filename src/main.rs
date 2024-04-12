@@ -1,16 +1,30 @@
 use std::time::Instant;
 
 use blokus_ai::game::{Player, State};
+use itertools::MultiUnzip;
 use rand::seq::SliceRandom;
+
+struct Stats {
+    move_ns: u128,
+    place_ns: u128,
+    fanout: usize,
+}
+
+fn geometric_mean(values: &Vec<f64>) -> f64 {
+    // Take the avg of logarithms
+    let avg: f64 = values.iter().copied().map(f64::ln).sum();
+    // Take the exponent of the avg
+    f64::exp(avg / values.len() as f64)
+}
+
+fn arithmetic_mean(values: &Vec<f64>) -> f64 {
+    values.iter().copied().sum::<f64>() / values.len() as f64
+}
 
 fn main() {
     let mut rng = rand::thread_rng();
 
-    let mut avg_move_t = 0u128;
-    let mut avg_place_t = 0u128;
-    let mut avg_fanout = 0usize;
-
-    let mut turns = 0u32;
+    let mut stats: Vec<Stats> = Vec::new();
 
     loop {
         let mut game = State::new(20, 20);
@@ -18,17 +32,13 @@ fn main() {
         loop {
             let mut played = false;
             for player in Player::iter() {
-                turns += 1;
-
                 let now = Instant::now();
                 let moves = game.get_moves(&player);
                 let moves: Vec<_> = moves;
-                let elapsed = now.elapsed();
-                avg_move_t += elapsed.as_nanos();
+                let move_elapsed = now.elapsed();
 
-                // println!("Calculation took {} ns", elapsed.as_nanos());
+                // println!("Calculation took {} ns", move_elapsed.as_nanos());
                 // println!("Player {} has {} moves", player, moves.len());
-                avg_fanout += moves.len();
 
                 if moves.is_empty() {
                     continue;
@@ -39,10 +49,15 @@ fn main() {
 
                 let now = Instant::now();
                 game.place_piece(&player, move_);
-                let elapsed = now.elapsed();
-                avg_place_t += elapsed.as_nanos();
+                let place_elapsed = now.elapsed();
                 // println!("{:?}", game);
                 played = true;
+
+                stats.push(Stats {
+                    move_ns: move_elapsed.as_nanos(),
+                    place_ns: place_elapsed.as_nanos(),
+                    fanout: moves.len(),
+                })
             }
 
             if !played {
@@ -50,22 +65,21 @@ fn main() {
             }
         }
 
+        let stats: (Vec<_>, Vec<_>, Vec<_>) = stats
+            .iter()
+            .map(|s| (s.move_ns as f64, s.place_ns as f64, s.fanout as f64))
+            .multiunzip();
+
         println!(
-            "Average move calculation time:\n\t{} ns = {} millis",
-            avg_move_t as f64 / turns as f64,
-            avg_move_t as f64 / turns as f64 / 1000000.
+            "Average move calculation time:\n\tArithmetic:{} ms",
+            arithmetic_mean(&stats.0) / 1000000.,
         );
 
         println!(
-            "Average move execution time:\n\t{} ns = {} millis",
-            avg_place_t as f64 / turns as f64,
-            avg_place_t as f64 / turns as f64 / 1000000.
+            "Average place calculation time:\n\tArithmetic:{} ms",
+            arithmetic_mean(&stats.1) / 1000000.,
         );
 
-        println!(
-            "Average fanout: {} over {} turns",
-            avg_fanout as f64 / turns as f64,
-            turns
-        );
+        println!("Average fanout:\n\tGeometric:{}", geometric_mean(&stats.2));
     }
 }
