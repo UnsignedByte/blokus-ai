@@ -21,3 +21,9 @@ opt-level = 3
 debug = 1
 inherits = "release"
 rustflags = ["-Ctarget-cpu=native"]
+
+[profile.x86]
+rustflags = ["-Ctarget-cpu=native", "--cfg", "use_x86"]
+opt-level = 3
+debug = 1
+inherits = "release"

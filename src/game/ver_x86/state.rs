@@ -297,8 +297,14 @@ impl State {
         }
     }
 
-    fn get_moves_for_piece(&self, moves: &mut Vec<Move>, player: &Player, pieceid: usize) {
-        let piece = &PIECES[pieceid];
+    pub fn get_moves_for_piece(
+        &self,
+        moves: &mut Vec<Move>,
+        pieces: &[Piece; PIECE_COUNT],
+        player: &Player,
+        pieceid: usize,
+    ) {
+        let piece = &pieces[pieceid];
         // The number of rows we need to check
         // let to_check = 20 - piece.width + 1;
 
@@ -355,11 +361,12 @@ impl State {
     /// Get the possible moves for a player
     pub fn get_moves<'a>(&'a self, player: &'a Player) -> Vec<Move> {
         let mut moves = Vec::with_capacity(1000);
+        let pieces = &*PIECES;
         // All the different piece transforms for the player
         for piece in (0..PIECE_COUNT)
             .filter(move |f| (1 << *f) & self.player_pieces[usize::from(player)] != 0)
         {
-            self.get_moves_for_piece(&mut moves, player, piece);
+            self.get_moves_for_piece(&mut moves, pieces, player, piece);
         }
         moves
     }

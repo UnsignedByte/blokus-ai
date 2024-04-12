@@ -190,13 +190,27 @@ impl State {
     }
 
     /// Get the possible moves for a player
-    pub fn get_moves<'a>(&'a self, player: &'a Player) -> impl Iterator<Item = Move> + 'a {
+    pub fn get_moves<'a>(&'a self, player: &'a Player) -> Vec<Move> {
+        let mut pieces: [bool; 400 * 21 * 8] = [false; 400 * 21 * 8];
         // All the different piece transforms for the player
         self.player_pieces[usize::from(player)]
             .iter()
             .enumerate()
             .filter(|(_, v)| **v)
             .flat_map(move |(piece, _)| self.get_moves_for_piece(player, PieceID::from(piece)))
+            // faster way to filter only unique moves
+            .filter(|m| {
+                let piece = usize::from(m.piece.piece);
+                let ver = m.piece.version;
+                let (x, y) = m.pos;
+                let x = x as usize;
+                let y = y as usize;
+                let uid = ((x * 20 + y) * 21 + piece) * 8 + ver;
+                let seen = pieces[uid];
+                pieces[uid] = true;
+                !seen
+            })
+            .collect()
     }
 
     /// Place a piece on the board

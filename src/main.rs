@@ -11,7 +11,6 @@ fn main() {
     let mut avg_fanout = 0usize;
 
     let mut turns = 0u32;
-    let mut pieces: [bool; 400 * 21 * 8] = [false; 400 * 21 * 8];
 
     loop {
         let mut game = State::new(20, 20);
@@ -21,20 +20,8 @@ fn main() {
             for player in Player::iter() {
                 turns += 1;
 
-                // fill the pieces buffer with zeros
-                pieces.fill(false);
                 let now = Instant::now();
                 let moves = game.get_moves(&player);
-                // faster way to filter only unique moves
-                // let moves = moves.filter(|m| {
-                //     let piece = usize::from(m.piece.piece);
-                //     let ver = m.piece.version;
-                //     let (x, y) = m.pos;
-                //     let uid = ((x * 20 + y) * 21 + piece) * 8 + ver;
-                //     let seen = pieces[uid];
-                //     pieces[uid] = true;
-                //     !seen
-                // });
                 let moves: Vec<_> = moves;
                 let elapsed = now.elapsed();
                 avg_move_t += elapsed.as_nanos();
