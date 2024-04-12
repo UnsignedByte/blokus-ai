@@ -316,9 +316,9 @@ impl State {
 
             let mut shape = piece.occupied_mask;
 
-            for offset in 0..4 {
+            for x in 0..(21 - piece.width) {
                 let mut y_shape = shape;
-                for x in 0..(21 - piece.width) {
+                for offset in 0..4 {
                     // 21 here because we need to check the last row
                     if Self::check(check0to4, y_shape) {
                         moves.push(Move::new(pieceid, (x, offset)));
@@ -332,23 +332,19 @@ impl State {
                     if Self::check(check12to16, y_shape) {
                         moves.push(Move::new(pieceid, (x, offset + 12)));
                     }
-                    y_shape = unsafe { shift_left_1(y_shape) };
+                    y_shape = unsafe { rotate_down_1(y_shape) };
                 }
-                shape = unsafe { rotate_down_1(shape) };
-            }
 
-            // this last one is special. The number of rows to check is dependent on the height of the piece
-            // by here, the shape has shifted down 4 tiles already.
+                // this last one is special. The number of rows to check is dependent on the height of the piece
+                // by here, the shape has shifted down 4 tiles already.
 
-            for offset in 4..(9 - piece.height) {
-                let mut y_shape = shape;
-                for x in 0..(21 - piece.width) {
+                for offset in 4..(9 - piece.height) {
                     if Self::check(check12to16, y_shape) {
                         moves.push(Move::new(pieceid, (x, offset + 12)));
                     }
-                    y_shape = unsafe { shift_left_1(y_shape) };
+                    y_shape = unsafe { rotate_down_1(y_shape) };
                 }
-                shape = unsafe { rotate_down_1(shape) };
+                shape = unsafe { shift_left_1(shape) };
             }
         } else {
             // This is the one case of the 5 high piece
