@@ -1,3 +1,5 @@
+cargo-features = ["profile-rustflags"]
+
 [package]
 name = "blokus-ai"
 edition = "2021"
@@ -12,8 +14,10 @@ rustc-hash = "1.1.0"
 
 [profile.release]
 opt-level = 3
+rustflags = ["-Ctarget-cpu=native"]
 
 [profile.perf]
 opt-level = 3
 debug = 1
 inherits = "release"
+rustflags = ["-Ctarget-cpu=native"]

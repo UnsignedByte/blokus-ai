@@ -108,19 +108,17 @@ impl From<Move> for (PieceTransformID, (i8, i8)) {
 }
 
 /// The game state.
-pub struct State<'game> {
+pub struct State {
     board: Mask,
     /// Corners for every player
     /// separated by corner direction
     corners: [[FxHashSet<(i8, i8)>; Corner::N]; Player::N],
     /// Playable pieces for every player
     player_pieces: [Vec<bool>; Player::N],
-    /// All pieces for every player
-    pieces: &'game [Vec<Piece>; Player::N],
 }
 
-impl<'game> State<'game> {
-    pub fn new(w: i8, h: i8, pieces: &'game [Vec<Piece>; Player::N]) -> Self {
+impl State {
+    pub fn new(w: i8, h: i8) -> Self {
         let mut corners: [[FxHashSet<(i8, i8)>; Corner::N]; Player::N] =
             std::array::from_fn(|_| std::array::from_fn(|_| FxHashSet::default()));
 
@@ -133,12 +131,11 @@ impl<'game> State<'game> {
         // Fourth player starts at the (0, h - 1) corner
         corners[usize::from(Player::Player4)][Corner::PosNeg as usize].insert((0, h - 1));
 
-        let player_pieces = std::array::from_fn(|i| vec![true; pieces[i].len()]);
+        let player_pieces = std::array::from_fn(|i| vec![true; PIECES[i].len()]);
 
         Self {
             board: Mask::new(w, vec![0; h as usize]),
             corners,
-            pieces,
             player_pieces,
         }
     }
@@ -154,7 +151,7 @@ impl<'game> State<'game> {
             "Attempted to play a piece that the player doesn't have."
         );
 
-        self.pieces[player][usize::from(piece)]
+        PIECES[player][usize::from(piece)]
             .versions
             .iter()
             .enumerate()
@@ -207,7 +204,7 @@ impl<'game> State<'game> {
         let Move { piece, pos } = *mv;
 
         let transformed_piece =
-            &self.pieces[usize::from(player)][usize::from(piece.piece)].versions[piece.version];
+            &PIECES[usize::from(player)][usize::from(piece.piece)].versions[piece.version];
 
         let (x, y) = pos;
 
@@ -269,7 +266,7 @@ impl<'game> State<'game> {
     }
 }
 
-impl Dimensioned for State<'_> {
+impl Dimensioned for State {
     #[inline]
     fn w(&self) -> i8 {
         self.board.w()
@@ -281,7 +278,7 @@ impl Dimensioned for State<'_> {
     }
 }
 
-impl Display for State<'_> {
+impl Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for row in 0..self.h() {
             for col in 0..self.w() {
@@ -310,7 +307,7 @@ impl Display for State<'_> {
     }
 }
 
-impl Debug for State<'_> {
+impl Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)?;
 

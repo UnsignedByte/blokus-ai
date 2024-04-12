@@ -4,8 +4,13 @@ use super::{
     utils::{rotate_down_1, shift_left_1, shift_up_1, ymm},
     Piece,
 };
-use crate::game::Player;
-use std::arch::x86_64::*;
+use crate::game::{ver_x86::utils::ymm_str, Player};
+use std::{
+    arch::x86_64::*,
+    array,
+    cmp::min,
+    fmt::{Debug, Display},
+};
 
 const PIECE_COUNT: usize = 91;
 
@@ -154,7 +159,7 @@ pub static PIECES: Lazy<[Piece; PIECE_COUNT]> = Lazy::new(|| {
 });
 
 /// A move.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct Move {
     pub piece: usize,
     pub pos: (i8, i8),
@@ -185,7 +190,8 @@ pub struct State {
 }
 
 impl State {
-    pub fn new() -> Self {
+    pub fn new(w: usize, h: usize) -> Self {
+        debug_assert!(w == 20 && h == 20);
         // Starting corners for each player
         let corner_masks = [
             // Player 1 gets
@@ -255,7 +261,6 @@ impl State {
         __m256i,
         /* corners */ __m256i, /* colors */
     ) {
-        debug_assert!(offset >= 1);
         unsafe {
             (
                 _mm256_loadu_si256(
@@ -270,7 +275,7 @@ impl State {
                     self.color_masks[usize::from(player)]
                         .as_ptr()
                         // This is moved back 1 because the neighbor mask is expanded
-                        .wrapping_add(offset - 1) as *const __m256i,
+                        .wrapping_add(offset) as *const __m256i,
                 ),
             )
         }
@@ -280,11 +285,15 @@ impl State {
     fn check((occupied, corners, color): (__m256i, __m256i, __m256i), shape: __m256i) -> bool {
         unsafe {
             // First check if its a valid corner
-            _mm256_testz_si256(corners, shape) != 0
+            // testz returns 0 if the result of the & is >0
+            // and 1 if the result is 0
+            _mm256_testz_si256(corners, shape) == 0
             // then check if this is unoccupied
-            && _mm256_testz_si256(occupied, shape) == 0
+            // we want the result to be 0
+            && _mm256_testz_si256(occupied, shape) != 0
             // finally check if the neighbors mask is empty
-            && _mm256_testz_si256(color, shape) == 0
+            // we want the result to be 0
+            && _mm256_testz_si256(color, shape) != 0
         }
     }
 
@@ -311,56 +320,42 @@ impl State {
             let mut shape = piece.occupied_mask;
 
             for offset in 0..4 {
+                let mut y_shape = shape;
                 for x in 0..(21 - piece.width) {
                     // 21 here because we need to check the last row
-                    if Self::check(check0to4, shape) {
+                    if Self::check(check0to4, y_shape) {
                         moves.push((x, offset));
                     }
-                    if Self::check(check4to8, shape) {
+                    if Self::check(check4to8, y_shape) {
                         moves.push((x, offset + 4));
                     }
-                    if Self::check(check8to12, shape) {
+                    if Self::check(check8to12, y_shape) {
                         moves.push((x, offset + 8));
                     }
-                    if Self::check(check12to16, shape) {
+                    if Self::check(check12to16, y_shape) {
                         moves.push((x, offset + 12));
                     }
-                    shape = unsafe { shift_left_1(shape) };
+                    y_shape = unsafe { shift_left_1(y_shape) };
                 }
                 shape = unsafe { rotate_down_1(shape) };
             }
 
             // this last one is special. The number of rows to check is dependent on the height of the piece
-            let check16to20 = self.get_checker(player, 16);
+            // by here, the shape has shifted down 4 tiles already.
 
-            for offset in 0..(5 - piece.height) {
+            for offset in 4..(9 - piece.height) {
+                let mut y_shape = shape;
                 for x in 0..(21 - piece.width) {
-                    if Self::check(check16to20, shape) {
-                        moves.push((x, offset + 16));
+                    if Self::check(check12to16, y_shape) {
+                        moves.push((x, offset + 12));
                     }
-                    shape = unsafe { shift_left_1(shape) };
+                    y_shape = unsafe { shift_left_1(y_shape) };
                 }
                 shape = unsafe { rotate_down_1(shape) };
             }
         } else {
             // This is the one case of the 5 high piece
             debug_assert!(piece.height == 5 && piece.width == 1);
-
-            for x in 0..20 {
-                // count the number of free cells above this row
-                // If this is >= 5, then we can place the piece here
-                let mut free_cnt = 0;
-                for y in 0..20 {
-                    if self.occupied_mask[y] & (1 << x) != 0 {
-                        free_cnt += 1;
-                    }
-                    if free_cnt >= 5 {
-                        // here, we subtract 4 because the piece is placed
-                        // at the first cell of the 5 cells
-                        moves.push((x, y as i8 - 4));
-                    }
-                }
-            }
         }
 
         moves.into_iter().map(move |pos| Move::new(pieceid, pos))
@@ -373,10 +368,149 @@ impl State {
             .filter(move |f| (1 << *f) & self.player_pieces[usize::from(player)] != 0)
             .flat_map(move |piece| self.get_moves_for_piece(player, piece))
     }
+
+    pub fn place_piece(&mut self, player: &Player, mv: &Move) {
+        let piece = &PIECES[mv.piece];
+        let (x, y) = mv.pos;
+        // println!("Placing {} at {:?}", mv.piece, mv.pos);
+
+        let pid = usize::from(player);
+
+        // mm128 version of x position
+        // let x_xmm = x as u128;
+        // let x_xmm= unsafe { _mm_loadu_si128(std::ptr::addr_of!(x_xmm) as *const __m128i) };
+
+        // Update the occupied mask
+        // if y + 8 <= 20 {
+        //     // we can safely update the mask here as y + 8 never goes out of bounds
+        //     let mask = self.occupied_mask[y as usize..y as usize + 8]
+        //         .try_into()
+        //         .unwrap();
+        //     let mask = unsafe { ymm(mask) };
+        //     let new_mask = unsafe { _mm256_or_si256(mask, _mm256_sll_epi32(piece.occupied_mask, x_xmm)) };
+        //     self.occupied_mask[y as usize..y as usize + 8].copy_from_slice(
+        //         &unsafe { std::mem::transmute::<_, [u32; 8]>(new_mask) },
+        //     );
+        // } else {
+        //     // here, we instead shift down the piece mask by the number of rows
+        //     // Uses the fact that the 8th row is always empty.
+        //     // If we are shifting by n, the permutation looks like this:
+        //     // (7-n), (7-n-1), ..., 0, 7, 7, ..., 7
+
+        //     // this permutation array is reversed for easy indexing
+        //     let permutation: [i32; 8] = array::from_fn(|i|
+        //         if i < y as usize {
+        //             7
+        //         } else {
+        //             i as i32 - y as i32
+        //         }
+        //     );
+        //     let shape = unsafe {
+        //         _mm256_permutevar8x32_epi32(piece.occupied_mask, _mm256_set_epi32(
+        //             permutation[7], permutation[6], permutation[5], permutation[4],
+        //             permutation[3], permutation[2], permutation[1], permutation[0]
+        //         ))
+        //     };
+
+        //     // Now we can hook up the masks just as we wanted
+        //     let mask = self.occupied_mask[12..20]
+        //     .try_into()
+        //     .unwrap();
+        //     let mask = unsafe { ymm(mask) };
+        //     let new_mask = unsafe { _mm256_or_si256(mask, _mm256_sll_epi32(shape, x_xmm)) };
+        //     self.occupied_mask[12..20].copy_from_slice(
+        //         &unsafe { std::mem::transmute::<_, [u32; 8]>(new_mask) },
+        //     );
+        // }
+
+        let occupied_mask =
+            unsafe { std::mem::transmute::<__m256i, [u32; 8]>(piece.occupied_mask) };
+        for i in 0..piece.height {
+            self.occupied_mask[(y + i) as usize] |= occupied_mask[i as usize] << x;
+        }
+
+        // Update the color and corner masks
+        // safety: we don't care about 1s in the overflowed borders because
+        // if a neighbor is filled in the boarder, its neighbor inside the board will already be filled as well
+        // if a corner is in the boarder, it will never be seen as we only check valid moves in the board
+        if x == 0 {
+            if y == 0 {
+                for i in 0..piece.height as usize + 1 {
+                    self.color_masks[pid][i] |= piece.neighbor_mask[i + 1] >> 1;
+                    self.corner_masks[pid][i] |= piece.corner_mask[i + 1] >> 1;
+                }
+            } else {
+                for i in 0..min(21 - y as usize, piece.height as usize + 2) {
+                    self.color_masks[pid][y as usize + i - 1] |= piece.neighbor_mask[i] >> 1;
+                    self.corner_masks[pid][y as usize + i - 1] |= piece.corner_mask[i] >> 1;
+                }
+            }
+        } else if y == 0 {
+            for i in 0..piece.height as usize + 1 {
+                self.color_masks[pid][i] |= piece.neighbor_mask[i + 1] << (x - 1);
+                self.corner_masks[pid][i] |= piece.corner_mask[i + 1] << (x - 1);
+            }
+        } else {
+            for i in 0..min(21 - y as usize, piece.height as usize + 2) {
+                self.color_masks[pid][y as usize + i - 1] |= piece.neighbor_mask[i] << (x - 1);
+                self.corner_masks[pid][y as usize + i - 1] |= piece.corner_mask[i] << (x - 1);
+            }
+        }
+
+        self.player_pieces[pid] &= !PIECES[mv.piece].id_mask;
+    }
 }
 
-impl Default for State {
-    fn default() -> Self {
-        Self::new()
+impl Display for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for row in 0..20 {
+            for col in 0..20 {
+                let cell = (self.occupied_mask[row] >> col & 1) != 0;
+                write!(f, "{}", if cell { 'X' } else { '-' })?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Occupied Mask:")?;
+        for x in self.occupied_mask.iter() {
+            writeln!(f, "{:020b}", x)?;
+        }
+        for player in Player::iter() {
+            let pid = usize::from(player);
+            let color = player.color();
+            writeln!(
+                f,
+                "Color Mask for player {}:",
+                color.paint(format!("{}", pid))
+            )?;
+            self.color_masks[usize::from(player)].iter().for_each(|x| {
+                writeln!(
+                    f,
+                    "{}",
+                    color.paint(format!("{:020b}", x & ((1 << 20) - 1)))
+                )
+                .unwrap();
+            });
+            writeln!(
+                f,
+                "Corner Mask for player {}:",
+                color.paint(format!("{}", pid))
+            )?;
+            self.corner_masks[usize::from(player)].iter().for_each(|x| {
+                writeln!(
+                    f,
+                    "{}",
+                    color.paint(format!("{:020b}", x & ((1 << 20) - 1)))
+                )
+                .unwrap();
+            });
+        }
+        Ok(())
     }
 }

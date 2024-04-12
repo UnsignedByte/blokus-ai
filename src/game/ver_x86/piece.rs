@@ -53,7 +53,7 @@ pub struct Piece {
     /// 0b01001
     /// ```
     /// We repeat this mask the same way we do with the occupied mask.
-    corner_mask: __m256i,
+    pub corner_mask: [u32; 8],
     /// Given the same piece as above, the neighbor mask would
     /// look like
     /// ```str
@@ -65,7 +65,7 @@ pub struct Piece {
     /// ```
     /// This "wraps" the original piece.
     /// This one isn't replicated like above.
-    pub neighbor_mask: __m256i,
+    pub neighbor_mask: [u32; 8],
 }
 
 impl Piece {
@@ -137,9 +137,9 @@ impl Piece {
                 width,
                 height,
                 occupied_mask: ymm(piece),
-                corner_mask: ymm(corner_mask),
+                corner_mask,
                 // repeated_mask: ymm(repeated_piece),
-                neighbor_mask: ymm(neighbor_mask),
+                neighbor_mask,
             }
         }
     }
@@ -153,13 +153,13 @@ impl Debug for Piece {
             for x in rows.iter() {
                 writeln!(f, "{:032b}", x)?;
             }
-            let rows = std::mem::transmute::<__m256i, [u32; 8]>(self.corner_mask);
+            let rows = self.corner_mask;
             writeln!(f, "Corner Mask:")?;
             for x in rows.iter() {
                 writeln!(f, "{:032b}", x)?;
             }
             writeln!(f, "Neighbor Mask:")?;
-            let rows = std::mem::transmute::<__m256i, [u32; 8]>(self.neighbor_mask);
+            let rows = self.neighbor_mask;
             for x in rows.iter() {
                 writeln!(f, "{:032b}", x)?;
             }
@@ -208,6 +208,6 @@ mod tests {
 
         let expected = [0b01100, 0b11110, 0b01110, 0b01111, 0b00110, 0, 0, 0];
 
-        assert!(unsafe { ymm_eq(piece.neighbor_mask, ymm(expected),) });
+        assert!(unsafe { ymm_eq(ymm(piece.neighbor_mask), ymm(expected),) });
     }
 }
