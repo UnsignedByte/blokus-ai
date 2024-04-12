@@ -297,13 +297,10 @@ impl State {
         }
     }
 
-    fn get_moves_for_piece(&self, player: &Player, pieceid: usize) -> impl Iterator<Item = Move> {
+    fn get_moves_for_piece(&self, moves: &mut Vec<Move>, player: &Player, pieceid: usize) {
         let piece = &PIECES[pieceid];
         // The number of rows we need to check
-        let to_check = 20 - piece.width + 1;
-
-        // There are up to 20^2 = 400 possible moves
-        let mut moves: Vec<(i8, i8)> = Vec::with_capacity(to_check as usize * to_check as usize);
+        // let to_check = 20 - piece.width + 1;
 
         if piece.height <= 4 {
             // The height of the piece is <= 4.
@@ -324,16 +321,16 @@ impl State {
                 for x in 0..(21 - piece.width) {
                     // 21 here because we need to check the last row
                     if Self::check(check0to4, y_shape) {
-                        moves.push((x, offset));
+                        moves.push(Move::new(pieceid, (x, offset)));
                     }
                     if Self::check(check4to8, y_shape) {
-                        moves.push((x, offset + 4));
+                        moves.push(Move::new(pieceid, (x, offset + 4)));
                     }
                     if Self::check(check8to12, y_shape) {
-                        moves.push((x, offset + 8));
+                        moves.push(Move::new(pieceid, (x, offset + 8)));
                     }
                     if Self::check(check12to16, y_shape) {
-                        moves.push((x, offset + 12));
+                        moves.push(Move::new(pieceid, (x, offset + 12)));
                     }
                     y_shape = unsafe { shift_left_1(y_shape) };
                 }
@@ -347,7 +344,7 @@ impl State {
                 let mut y_shape = shape;
                 for x in 0..(21 - piece.width) {
                     if Self::check(check12to16, y_shape) {
-                        moves.push((x, offset + 12));
+                        moves.push(Move::new(pieceid, (x, offset + 12)));
                     }
                     y_shape = unsafe { shift_left_1(y_shape) };
                 }
@@ -357,16 +354,18 @@ impl State {
             // This is the one case of the 5 high piece
             debug_assert!(piece.height == 5 && piece.width == 1);
         }
-
-        moves.into_iter().map(move |pos| Move::new(pieceid, pos))
     }
 
     /// Get the possible moves for a player
-    pub fn get_moves<'a>(&'a self, player: &'a Player) -> impl Iterator<Item = Move> + 'a {
+    pub fn get_moves<'a>(&'a self, player: &'a Player) -> Vec<Move> {
+        let mut moves = Vec::with_capacity(1000);
         // All the different piece transforms for the player
-        (0..PIECE_COUNT)
+        for piece in (0..PIECE_COUNT)
             .filter(move |f| (1 << *f) & self.player_pieces[usize::from(player)] != 0)
-            .flat_map(move |piece| self.get_moves_for_piece(player, piece))
+        {
+            self.get_moves_for_piece(&mut moves, player, piece);
+        }
+        moves
     }
 
     pub fn place_piece(&mut self, player: &Player, mv: &Move) {

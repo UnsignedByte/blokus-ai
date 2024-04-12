@@ -35,7 +35,7 @@ fn main() {
                 //     pieces[uid] = true;
                 //     !seen
                 // });
-                let moves: Vec<_> = moves.collect();
+                let moves: Vec<_> = moves;
                 let elapsed = now.elapsed();
                 avg_move_t += elapsed.as_nanos();
 
