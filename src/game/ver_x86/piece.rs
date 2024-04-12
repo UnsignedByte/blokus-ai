@@ -58,9 +58,9 @@ pub struct Piece {
     /// look like
     /// ```str
     /// 0b01100
-    /// 0b10010
-    /// 0b01010
-    /// 0b01001
+    /// 0b11110
+    /// 0b01110
+    /// 0b01111
     /// 0b00110
     /// ```
     /// This "wraps" the original piece.
@@ -108,6 +108,10 @@ impl Piece {
                     }
                 }
             }
+        }
+
+        for row in 0..height as usize {
+            neighbor_mask[row + 1] |= piece[row] << 1;
         }
 
         // Replicate the mask across the board
@@ -202,7 +206,7 @@ mod tests {
         let piece = Piece::new(3, 3, 0, [0b110, 0b010, 0b011, 0, 0, 0, 0, 0]);
         println!("{:?}", piece);
 
-        let expected = [0b01100, 0b10010, 0b01010, 0b01001, 0b00110, 0, 0, 0];
+        let expected = [0b01100, 0b11110, 0b01110, 0b01111, 0b00110, 0, 0, 0];
 
         assert!(unsafe { ymm_eq(piece.neighbor_mask, ymm(expected),) });
     }

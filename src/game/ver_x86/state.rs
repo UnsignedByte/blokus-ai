@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 
 use super::{
-    utils::{rotate_down_1, shift_up_1, ymm},
+    utils::{rotate_down_1, shift_left_1, shift_up_1, ymm},
     Piece,
 };
 use crate::game::Player;
@@ -171,6 +171,9 @@ pub struct State {
     /// Occupation mask (the bitwise or of all the colormasks)
     occupied_mask: [u32; 20],
     /// Occupation masks for each player
+    /// this includes the neighbors of occupied cells,
+    /// as these tiles are not playable by the same
+    /// color
     color_masks: [[u32; 20]; Player::N],
     /// Corner masks for each player
     corner_masks: [[u32; 20]; Player::N],
@@ -274,17 +277,14 @@ impl State {
     }
 
     #[inline]
-    fn check(
-        (occupied, corners, color): (__m256i, __m256i, __m256i),
-        (shape, neighbors): (__m256i, __m256i),
-    ) -> bool {
+    fn check((occupied, corners, color): (__m256i, __m256i, __m256i), shape: __m256i) -> bool {
         unsafe {
             // First check if its a valid corner
             _mm256_testz_si256(corners, shape) != 0
             // then check if this is unoccupied
             && _mm256_testz_si256(occupied, shape) == 0
             // finally check if the neighbors mask is empty
-            && _mm256_testz_si256(color, neighbors) == 0
+            && _mm256_testz_si256(color, shape) == 0
         }
     }
 
@@ -296,73 +296,69 @@ impl State {
         // There are up to 20^2 = 400 possible moves
         let mut moves: Vec<(i8, i8)> = Vec::with_capacity(to_check as usize * to_check as usize);
 
-        let row_pair = 0;
-        // Check
-        let checker = unsafe {
-            (
-                ymm(self.occupied_mask[0..8].try_into().unwrap()),
-                ymm(self.corner_masks[usize::from(player)][0..8]
-                    .try_into()
-                    .unwrap()),
-                ymm(self.color_masks[usize::from(player)][0..8]
-                    .try_into()
-                    .unwrap()),
-            )
-        };
+        if piece.height <= 4 {
+            // The height of the piece is <= 4.
+            // we can check the rows in groups of 4.
+            // We do as follows:
+            // Generate a checker for the first row in the gap
+            // Rotate down by 1 and check again
+            // repeat
+            let check0to4 = self.get_checker(player, 0);
+            let check4to8 = self.get_checker(player, 4);
+            let check8to12 = self.get_checker(player, 8);
+            let check12to16 = self.get_checker(player, 12);
 
-        let row1 = (piece.occupied_mask, unsafe {
-            shift_up_1(piece.neighbor_mask)
-        });
+            let mut shape = piece.occupied_mask;
 
-        let row2 = (
-            unsafe { rotate_down_1(piece.occupied_mask) },
-            piece.neighbor_mask,
-        );
-
-        for i in 0..to_check {
-            if Self::check(checker, row1) {
-                moves.push((i, 0));
-            }
-
-            if Self::check(checker, row2) {
-                moves.push((i, 1));
-            }
-        }
-
-        // Check two rows at a time
-        for row_pair in 1..(to_check / 2) {
-            // check every pair of rows
-            let checker = self.get_checker(player, 2 * row_pair as usize);
-
-            let row1 = (piece.occupied_mask, piece.neighbor_mask);
-
-            let row2 = unsafe {
-                (
-                    rotate_down_1(piece.occupied_mask),
-                    rotate_down_1(piece.neighbor_mask),
-                )
-            };
-
-            for i in 0..to_check {
-                if Self::check(checker, row1) {
-                    moves.push((i, row_pair * 2));
+            for offset in 0..4 {
+                for x in 0..(21 - piece.width) {
+                    // 21 here because we need to check the last row
+                    if Self::check(check0to4, shape) {
+                        moves.push((x, offset));
+                    }
+                    if Self::check(check4to8, shape) {
+                        moves.push((x, offset + 4));
+                    }
+                    if Self::check(check8to12, shape) {
+                        moves.push((x, offset + 8));
+                    }
+                    if Self::check(check12to16, shape) {
+                        moves.push((x, offset + 12));
+                    }
+                    shape = unsafe { shift_left_1(shape) };
                 }
-
-                if Self::check(checker, row2) {
-                    moves.push((i, row_pair * 2 + 1));
-                }
+                shape = unsafe { rotate_down_1(shape) };
             }
-        }
 
-        if piece.height % 2 == 0 {
-            // Check the final row
-            let checker = self.get_checker(player, (to_check / 2) as usize);
+            // this last one is special. The number of rows to check is dependent on the height of the piece
+            let check16to20 = self.get_checker(player, 16);
 
-            let row1 = (piece.occupied_mask, piece.neighbor_mask);
+            for offset in 0..(5 - piece.height) {
+                for x in 0..(21 - piece.width) {
+                    if Self::check(check16to20, shape) {
+                        moves.push((x, offset + 16));
+                    }
+                    shape = unsafe { shift_left_1(shape) };
+                }
+                shape = unsafe { rotate_down_1(shape) };
+            }
+        } else {
+            // This is the one case of the 5 high piece
+            debug_assert!(piece.height == 5 && piece.width == 1);
 
-            for i in 0..to_check {
-                if Self::check(checker, row1) {
-                    moves.push((i, row_pair * 2));
+            for x in 0..20 {
+                // count the number of free cells above this row
+                // If this is >= 5, then we can place the piece here
+                let mut free_cnt = 0;
+                for y in 0..20 {
+                    if self.occupied_mask[y] & (1 << x) != 0 {
+                        free_cnt += 1;
+                    }
+                    if free_cnt >= 5 {
+                        // here, we subtract 4 because the piece is placed
+                        // at the first cell of the 5 cells
+                        moves.push((x, y as i8 - 4));
+                    }
                 }
             }
         }
