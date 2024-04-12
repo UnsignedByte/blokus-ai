@@ -284,16 +284,16 @@ impl State {
     #[inline]
     fn check((occupied, corners, color): (__m256i, __m256i, __m256i), shape: __m256i) -> bool {
         unsafe {
-            // First check if its a valid corner
+            // check if the neighbors mask is empty
+            // we want the result to be 0
+            _mm256_testz_si256(color, shape) != 0
+            // check if its a valid corner
             // testz returns 0 if the result of the & is >0
             // and 1 if the result is 0
-            _mm256_testz_si256(corners, shape) == 0
-            // then check if this is unoccupied
+            && _mm256_testz_si256(corners, shape) == 0
+            // check if this is unoccupied
             // we want the result to be 0
             && _mm256_testz_si256(occupied, shape) != 0
-            // finally check if the neighbors mask is empty
-            // we want the result to be 0
-            && _mm256_testz_si256(color, shape) != 0
         }
     }
 
