@@ -16,14 +16,20 @@ rustc-hash = "1.1.0"
 opt-level = 3
 rustflags = ["-Ctarget-cpu=native"]
 
-[profile.perf]
+[profile.perf1]
 opt-level = 3
 debug = 1
 inherits = "release"
-rustflags = ["-Ctarget-cpu=native"]
+rustflags = ["-Ctarget-cpu=native", "--cfg", "alg_ver=\"1\""]
 
-[profile.x86]
-rustflags = ["-Ctarget-cpu=native", "--cfg", "use_x86"]
+[profile.perf2]
+rustflags = ["-Ctarget-cpu=native", "--cfg", "alg_ver=\"2\""]
+opt-level = 3
+debug = 1
+inherits = "release"
+
+[profile.perf3]
+rustflags = ["-Ctarget-cpu=native", "--cfg", "alg_ver=\"3\""]
 opt-level = 3
 debug = 1
 inherits = "release"

@@ -10,14 +10,14 @@ struct Stats {
     fanout: usize,
 }
 
-fn geometric_mean(values: &Vec<f64>) -> f64 {
+fn geometric_mean(values: &[f64]) -> f64 {
     // Take the avg of logarithms
     let avg: f64 = values.iter().copied().map(f64::ln).sum();
     // Take the exponent of the avg
     f64::exp(avg / values.len() as f64)
 }
 
-fn arithmetic_mean(values: &Vec<f64>) -> f64 {
+fn arithmetic_mean(values: &[f64]) -> f64 {
     values.iter().copied().sum::<f64>() / values.len() as f64
 }
 

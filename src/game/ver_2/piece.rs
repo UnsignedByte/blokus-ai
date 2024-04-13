@@ -1,4 +1,4 @@
-use crate::game::{ver_x86::utils::ymm, Corner, Neighbor};
+use crate::game::{ver_2::utils::ymm, Corner, Neighbor};
 use std::{arch::x86_64::*, fmt::Debug};
 
 /// Struct representing a piece
@@ -170,7 +170,7 @@ impl Debug for Piece {
 
 #[cfg(test)]
 mod tests {
-    use crate::game::ver_x86::utils::{ymm, ymm_eq};
+    use crate::game::ver_2::utils::{ymm, ymm_eq};
 
     use super::*;
     #[test]

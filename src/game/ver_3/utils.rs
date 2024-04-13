@@ -51,7 +51,7 @@ pub fn ymm_str(ymm: __m256i) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::game::ver_x86::utils::*;
+    use crate::game::ver_3::utils::*;
 
     #[test]
     fn rotate_down_test() {
