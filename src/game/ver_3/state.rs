@@ -8,153 +8,150 @@ use crate::game::{ver_3::utils::ymm_str, Player};
 use std::{
     arch::x86_64::*,
     array,
-    cmp::min,
+    cmp::{max, min},
     fmt::{Debug, Display},
 };
 
-const PIECE_COUNT: usize = 91;
+const PIECE_COUNT: usize = 89;
 
 pub static PIECES: Lazy<[Piece; PIECE_COUNT]> = Lazy::new(|| {
     [
         // 1 tile pieces
         // X - no transformations
-        Piece::new(1, 1, 0b1, [0b1, 0, 0, 0, 0, 0, 0, 0]),
+        Piece::new(1, 1, 0b1, [0b1, 0, 0, 0]),
         // 2 tile pieces
         // XX - 2 states
-        Piece::new(2, 1, 0b11 << 1, [0b11, 0, 0, 0, 0, 0, 0, 0]),
-        Piece::new(1, 2, 0b11 << 1, [0b1, 0b1, 0, 0, 0, 0, 0, 0]),
+        Piece::new(2, 1, 0b11 << 1, [0b11, 0, 0, 0]),
+        Piece::new(1, 2, 0b11 << 1, [0b1, 0b1, 0, 0]),
         // 3 tile pieces
         // XXX - 2 states
-        Piece::new(3, 1, 0b11 << 3, [0b111, 0, 0, 0, 0, 0, 0, 0]),
-        Piece::new(1, 3, 0b11 << 3, [0b1, 0b1, 0b1, 0, 0, 0, 0, 0]),
+        Piece::new(3, 1, 0b11 << 3, [0b111, 0, 0, 0]),
+        Piece::new(1, 3, 0b11 << 3, [0b1, 0b1, 0b1, 0]),
         // XX
         // X  - 4 states
-        Piece::new(2, 2, 0b1111 << 5, [0b11, 0b1, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 2, 0b1111 << 5, [0b11, 0b10, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 2, 0b1111 << 5, [0b1, 0b11, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 2, 0b1111 << 5, [0b10, 0b11, 0, 0, 0, 0, 0, 0]),
+        Piece::new(2, 2, 0b1111 << 5, [0b11, 0b1, 0, 0]),
+        Piece::new(2, 2, 0b1111 << 5, [0b11, 0b10, 0, 0]),
+        Piece::new(2, 2, 0b1111 << 5, [0b1, 0b11, 0, 0]),
+        Piece::new(2, 2, 0b1111 << 5, [0b10, 0b11, 0, 0]),
         // 4 tile pieces
         // XXXX - 2 states
-        Piece::new(4, 1, 0b11 << 9, [0b1111, 0, 0, 0, 0, 0, 0, 0]),
-        Piece::new(1, 4, 0b11 << 9, [0b1, 0b1, 0b1, 0b1, 0, 0, 0, 0]),
+        Piece::new(4, 1, 0b11 << 9, [0b1111, 0, 0, 0]),
+        Piece::new(1, 4, 0b11 << 9, [0b1, 0b1, 0b1, 0b1]),
         // XXX
         // X   - 8 states
-        Piece::new(3, 2, 0b11111111 << 11, [0b111, 0b1, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b11111111 << 11, [0b111, 0b100, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b11111111 << 11, [0b1, 0b111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b11111111 << 11, [0b100, 0b111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b11111111 << 11, [0b11, 0b10, 0b10, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b11111111 << 11, [0b11, 0b1, 0b1, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b11111111 << 11, [0b1, 0b1, 0b11, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b11111111 << 11, [0b10, 0b10, 0b11, 0, 0, 0, 0, 0]),
+        Piece::new(3, 2, 0b11111111 << 11, [0b111, 0b1, 0, 0]),
+        Piece::new(3, 2, 0b11111111 << 11, [0b111, 0b100, 0, 0]),
+        Piece::new(3, 2, 0b11111111 << 11, [0b1, 0b111, 0, 0]),
+        Piece::new(3, 2, 0b11111111 << 11, [0b100, 0b111, 0, 0]),
+        Piece::new(2, 3, 0b11111111 << 11, [0b11, 0b10, 0b10, 0]),
+        Piece::new(2, 3, 0b11111111 << 11, [0b11, 0b1, 0b1, 0]),
+        Piece::new(2, 3, 0b11111111 << 11, [0b1, 0b1, 0b11, 0]),
+        Piece::new(2, 3, 0b11111111 << 11, [0b10, 0b10, 0b11, 0]),
         // XX
         //  XX - 4 states
-        Piece::new(3, 2, 0b1111 << 19, [0b110, 0b011, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b1111 << 19, [0b011, 0b110, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b1111 << 19, [0b10, 0b11, 0b01, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b1111 << 19, [0b01, 0b11, 0b10, 0, 0, 0, 0, 0]),
+        Piece::new(3, 2, 0b1111 << 19, [0b110, 0b011, 0, 0]),
+        Piece::new(3, 2, 0b1111 << 19, [0b011, 0b110, 0, 0]),
+        Piece::new(2, 3, 0b1111 << 19, [0b10, 0b11, 0b01, 0]),
+        Piece::new(2, 3, 0b1111 << 19, [0b01, 0b11, 0b10, 0]),
         // XXX
         //  X - 4 states
-        Piece::new(3, 2, 0b1111 << 23, [0b111, 0b010, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b1111 << 23, [0b010, 0b111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b1111 << 23, [0b10, 0b11, 0b10, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b1111 << 23, [0b01, 0b11, 0b01, 0, 0, 0, 0, 0]),
+        Piece::new(3, 2, 0b1111 << 23, [0b111, 0b010, 0, 0]),
+        Piece::new(3, 2, 0b1111 << 23, [0b010, 0b111, 0, 0]),
+        Piece::new(2, 3, 0b1111 << 23, [0b10, 0b11, 0b10, 0]),
+        Piece::new(2, 3, 0b1111 << 23, [0b01, 0b11, 0b01, 0]),
         // XX
         // XX - 1 state
-        Piece::new(2, 2, 0b1 << 27, [0b11, 0b11, 0, 0, 0, 0, 0, 0]),
+        Piece::new(2, 2, 0b1 << 27, [0b11, 0b11, 0, 0]),
         // 5 tile pieces
-        // XXXXX - 2 states
-        Piece::new(5, 1, 0b11 << 28, [0b11111, 0, 0, 0, 0, 0, 0, 0]),
-        Piece::new(1, 5, 0b11 << 28, [0b1, 0b1, 0b1, 0b1, 0b1, 0, 0, 0]),
         //  XX
         // XX
         //  X - 8 states
-        Piece::new(3, 3, 0b11111111 << 30, [0b110, 0b011, 0b010, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b11111111 << 30, [0b011, 0b110, 0b010, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b11111111 << 30, [0b010, 0b110, 0b011, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b11111111 << 30, [0b010, 0b011, 0b110, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b11111111 << 30, [0b010, 0b111, 0b001, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b11111111 << 30, [0b001, 0b111, 0b010, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b11111111 << 30, [0b010, 0b111, 0b100, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b11111111 << 30, [0b100, 0b111, 0b010, 0, 0, 0, 0, 0]),
+        Piece::new(3, 3, 0b11111111 << 28, [0b110, 0b011, 0b010, 0]),
+        Piece::new(3, 3, 0b11111111 << 28, [0b011, 0b110, 0b010, 0]),
+        Piece::new(3, 3, 0b11111111 << 28, [0b010, 0b110, 0b011, 0]),
+        Piece::new(3, 3, 0b11111111 << 28, [0b010, 0b011, 0b110, 0]),
+        Piece::new(3, 3, 0b11111111 << 28, [0b010, 0b111, 0b001, 0]),
+        Piece::new(3, 3, 0b11111111 << 28, [0b001, 0b111, 0b010, 0]),
+        Piece::new(3, 3, 0b11111111 << 28, [0b010, 0b111, 0b100, 0]),
+        Piece::new(3, 3, 0b11111111 << 28, [0b100, 0b111, 0b010, 0]),
         // XXXX
         // X    - 8 states
-        Piece::new(4, 2, 0b11111111 << 38, [0b1111, 0b0001, 0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 38, [0b1111, 0b1000, 0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 38, [0b1000, 0b1111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 38, [0b0001, 0b1111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 38, [0b11, 0b10, 0b10, 0b10, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 38, [0b11, 0b01, 0b01, 0b01, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 38, [0b10, 0b10, 0b10, 0b11, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 38, [0b01, 0b01, 0b01, 0b11, 0, 0, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 36, [0b1111, 0b0001, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 36, [0b1111, 0b1000, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 36, [0b1000, 0b1111, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 36, [0b0001, 0b1111, 0, 0]),
+        Piece::new(2, 4, 0b11111111 << 36, [0b11, 0b10, 0b10, 0b10]),
+        Piece::new(2, 4, 0b11111111 << 36, [0b11, 0b01, 0b01, 0b01]),
+        Piece::new(2, 4, 0b11111111 << 36, [0b10, 0b10, 0b10, 0b11]),
+        Piece::new(2, 4, 0b11111111 << 36, [0b01, 0b01, 0b01, 0b11]),
         // XXX
         //   XX - 8 states
-        Piece::new(4, 2, 0b11111111 << 46, [0b1110, 0b0011, 0b0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 46, [0b0111, 0b1100, 0b0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 46, [0b0011, 0b1110, 0b0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 46, [0b1100, 0b0111, 0b0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 46, [0b10, 0b10, 0b11, 0b01, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 46, [0b01, 0b01, 0b11, 0b10, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 46, [0b10, 0b11, 0b01, 0b01, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 46, [0b01, 0b11, 0b10, 0b10, 0, 0, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 44, [0b1110, 0b0011, 0b0, 0]),
+        Piece::new(4, 2, 0b11111111 << 44, [0b0111, 0b1100, 0b0, 0]),
+        Piece::new(4, 2, 0b11111111 << 44, [0b0011, 0b1110, 0b0, 0]),
+        Piece::new(4, 2, 0b11111111 << 44, [0b1100, 0b0111, 0b0, 0]),
+        Piece::new(2, 4, 0b11111111 << 44, [0b10, 0b10, 0b11, 0b01]),
+        Piece::new(2, 4, 0b11111111 << 44, [0b01, 0b01, 0b11, 0b10]),
+        Piece::new(2, 4, 0b11111111 << 44, [0b10, 0b11, 0b01, 0b01]),
+        Piece::new(2, 4, 0b11111111 << 44, [0b01, 0b11, 0b10, 0b10]),
         // XX
         // XXX - 8 states
-        Piece::new(3, 2, 0b11111111 << 54, [0b110, 0b111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b11111111 << 54, [0b111, 0b110, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b11111111 << 54, [0b011, 0b111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b11111111 << 54, [0b111, 0b011, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b11111111 << 54, [0b11, 0b11, 0b01, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b11111111 << 54, [0b11, 0b11, 0b10, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b11111111 << 54, [0b01, 0b11, 0b11, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b11111111 << 54, [0b10, 0b11, 0b11, 0, 0, 0, 0, 0]),
+        Piece::new(3, 2, 0b11111111 << 52, [0b110, 0b111, 0, 0]),
+        Piece::new(3, 2, 0b11111111 << 52, [0b111, 0b110, 0, 0]),
+        Piece::new(3, 2, 0b11111111 << 52, [0b011, 0b111, 0, 0]),
+        Piece::new(3, 2, 0b11111111 << 52, [0b111, 0b011, 0, 0]),
+        Piece::new(2, 3, 0b11111111 << 52, [0b11, 0b11, 0b01, 0]),
+        Piece::new(2, 3, 0b11111111 << 52, [0b11, 0b11, 0b10, 0]),
+        Piece::new(2, 3, 0b11111111 << 52, [0b01, 0b11, 0b11, 0]),
+        Piece::new(2, 3, 0b11111111 << 52, [0b10, 0b11, 0b11, 0]),
         // XXX
         //  X
         //  X - 4 states
-        Piece::new(3, 3, 0b1111 << 62, [0b111, 0b010, 0b010, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 62, [0b010, 0b010, 0b111, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 62, [0b001, 0b111, 0b001, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 62, [0b100, 0b111, 0b100, 0, 0, 0, 0, 0]),
+        Piece::new(3, 3, 0b1111 << 60, [0b111, 0b010, 0b010, 0]),
+        Piece::new(3, 3, 0b1111 << 60, [0b010, 0b010, 0b111, 0]),
+        Piece::new(3, 3, 0b1111 << 60, [0b001, 0b111, 0b001, 0]),
+        Piece::new(3, 3, 0b1111 << 60, [0b100, 0b111, 0b100, 0]),
         // X X
         // XXX - 4 states
-        Piece::new(3, 2, 0b1111 << 66, [0b101, 0b111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(3, 2, 0b1111 << 66, [0b111, 0b101, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b1111 << 66, [0b11, 0b10, 0b11, 0, 0, 0, 0, 0]),
-        Piece::new(2, 3, 0b1111 << 66, [0b11, 0b01, 0b11, 0, 0, 0, 0, 0]),
+        Piece::new(3, 2, 0b1111 << 64, [0b101, 0b111, 0, 0]),
+        Piece::new(3, 2, 0b1111 << 64, [0b111, 0b101, 0, 0]),
+        Piece::new(2, 3, 0b1111 << 64, [0b11, 0b10, 0b11, 0]),
+        Piece::new(2, 3, 0b1111 << 64, [0b11, 0b01, 0b11, 0]),
         // X
         // X
         // XXX - 4 states
-        Piece::new(3, 3, 0b1111 << 70, [0b100, 0b100, 0b111, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 70, [0b001, 0b001, 0b111, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 70, [0b111, 0b100, 0b100, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 70, [0b111, 0b001, 0b001, 0, 0, 0, 0, 0]),
+        Piece::new(3, 3, 0b1111 << 68, [0b100, 0b100, 0b111, 0]),
+        Piece::new(3, 3, 0b1111 << 68, [0b001, 0b001, 0b111, 0]),
+        Piece::new(3, 3, 0b1111 << 68, [0b111, 0b100, 0b100, 0]),
+        Piece::new(3, 3, 0b1111 << 68, [0b111, 0b001, 0b001, 0]),
         // X
         // XX
         //  XX - 4 states
-        Piece::new(3, 3, 0b1111 << 74, [0b100, 0b110, 0b011, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 74, [0b011, 0b110, 0b100, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 74, [0b001, 0b011, 0b110, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 74, [0b110, 0b011, 0b001, 0, 0, 0, 0, 0]),
+        Piece::new(3, 3, 0b1111 << 72, [0b100, 0b110, 0b011, 0]),
+        Piece::new(3, 3, 0b1111 << 72, [0b011, 0b110, 0b100, 0]),
+        Piece::new(3, 3, 0b1111 << 72, [0b001, 0b011, 0b110, 0]),
+        Piece::new(3, 3, 0b1111 << 72, [0b110, 0b011, 0b001, 0]),
         //  X
         // XXX
         //  X  - 1 state
-        Piece::new(3, 3, 0b1 << 78, [0b010, 0b111, 0b010, 0, 0, 0, 0, 0]),
+        Piece::new(3, 3, 0b1 << 76, [0b010, 0b111, 0b010, 0]),
         //   X
         // XXXX - 8 states
-        Piece::new(4, 2, 0b11111111 << 79, [0b1111, 0b0010, 0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 79, [0b1111, 0b0100, 0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 79, [0b0010, 0b1111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(4, 2, 0b11111111 << 79, [0b0100, 0b1111, 0, 0, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 79, [0b01, 0b01, 0b11, 0b01, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 79, [0b01, 0b11, 0b01, 0b01, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 79, [0b10, 0b10, 0b11, 0b10, 0, 0, 0, 0]),
-        Piece::new(2, 4, 0b11111111 << 79, [0b10, 0b11, 0b10, 0b10, 0, 0, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 77, [0b1111, 0b0010, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 77, [0b1111, 0b0100, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 77, [0b0010, 0b1111, 0, 0]),
+        Piece::new(4, 2, 0b11111111 << 77, [0b0100, 0b1111, 0, 0]),
+        Piece::new(2, 4, 0b11111111 << 77, [0b01, 0b01, 0b11, 0b01]),
+        Piece::new(2, 4, 0b11111111 << 77, [0b01, 0b11, 0b01, 0b01]),
+        Piece::new(2, 4, 0b11111111 << 77, [0b10, 0b10, 0b11, 0b10]),
+        Piece::new(2, 4, 0b11111111 << 77, [0b10, 0b11, 0b10, 0b10]),
         // XX
         //  X
         //  XX - 4 states
-        Piece::new(3, 3, 0b1111 << 87, [0b110, 0b010, 0b011, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 87, [0b011, 0b010, 0b110, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 87, [0b001, 0b111, 0b100, 0, 0, 0, 0, 0]),
-        Piece::new(3, 3, 0b1111 << 87, [0b100, 0b111, 0b001, 0, 0, 0, 0, 0]),
+        Piece::new(3, 3, 0b1111 << 85, [0b110, 0b010, 0b011, 0]),
+        Piece::new(3, 3, 0b1111 << 85, [0b011, 0b010, 0b110, 0]),
+        Piece::new(3, 3, 0b1111 << 85, [0b001, 0b111, 0b100, 0]),
+        Piece::new(3, 3, 0b1111 << 85, [0b100, 0b111, 0b001, 0]),
     ]
 });
 
@@ -169,24 +166,6 @@ impl Move {
     pub fn new(piece: usize, pos: (i8, i8)) -> Self {
         Self { piece, pos }
     }
-}
-
-/// The game state
-pub struct State {
-    /// Occupation mask (the bitwise or of all the colormasks)
-    occupied_mask: [u32; 20],
-    /// Occupation masks for each player
-    /// this includes the neighbors of occupied cells,
-    /// as these tiles are not playable by the same
-    /// color
-    color_masks: [[u32; 20]; Player::N],
-    /// Corner masks for each player
-    corner_masks: [[u32; 20]; Player::N],
-    /// Playable pieces for every player
-    /// stored as a [u128] where the lower [PIECE_COUNT] bits
-    /// represent whether a player has the piece
-    /// on hand or not
-    player_pieces: [u128; Player::N],
 }
 
 #[derive(Copy, Clone)]
@@ -246,6 +225,25 @@ impl Default for Subsquares {
             valid_corners: [0u16; 400],
         }
     }
+}
+
+/// The game state
+pub struct State {
+    /// Occupation mask (the bitwise or of all the colormasks)
+    occupied_mask: [u32; 20],
+    /// Occupation masks for each player
+    /// this includes the neighbors of occupied cells,
+    /// as these tiles are not playable by the same
+    /// color
+    color_masks: [[u32; 20]; Player::N],
+    /// Corner masks for each player
+    corner_masks: [[u32; 20]; Player::N],
+    subsquares: [Subsquares; Player::N],
+    /// Playable pieces for every player
+    /// stored as a [u128] where the lower [PIECE_COUNT] bits
+    /// represent whether a player has the piece
+    /// on hand or not
+    player_pieces: [u128; Player::N],
 }
 
 type Checker = (__m256i, __m256i, __m256i);
@@ -411,94 +409,35 @@ impl State {
     }
 
     pub fn place_piece(&mut self, player: &Player, mv: &Move) {
+        // a piece placed at a position
         let piece = &PIECES[mv.piece];
         let (x, y) = mv.pos;
-        // println!("Placing {} at {:?}", mv.piece, mv.pos);
 
-        let pid = usize::from(player);
+        // Each piece has a 4x4 mask and a 6x6 neighbor mask
+        // So therefore it influences up to a 9x9 square of 81 different masks
+        // We need to update the occupied_or_color and corner masks for each of these subsquares
+        for offset_x in max(0, x - 4)..min(20 - 3, x + 4) {
+            for offset_y in max(0, x - 4)..min(20 - 3, x + 4) {
+                let overlap_x = (
+                    max(max(0, x - 1), offset_x) - x + 1,
+                    min(min(x + 5, 20), offset_x + 6) - x + 1,
+                );
+                let overlap_y = (
+                    (max(max(0, y - 1), offset_y) - y + 1) as usize,
+                    (min(min(y + 5, 20), offset_y + 6) - y + 1) as usize,
+                );
 
-        // mm128 version of x position
-        // let x_xmm = x as u128;
-        // let x_xmm= unsafe { _mm_loadu_si128(std::ptr::addr_of!(x_xmm) as *const __m128i) };
+                let mut neighbors = [0u8; 6];
+                // filter only the overlapping part
+                neighbors[overlap_y.0..overlap_y.1]
+                    .copy_from_slice(&piece.neighbor_mask[overlap_y.0..overlap_y.1]);
 
-        // Update the occupied mask
-        // if y + 8 <= 20 {
-        //     // we can safely update the mask here as y + 8 never goes out of bounds
-        //     let mask = self.occupied_mask[y as usize..y as usize + 8]
-        //         .try_into()
-        //         .unwrap();
-        //     let mask = unsafe { ymm(mask) };
-        //     let new_mask = unsafe { _mm256_or_si256(mask, _mm256_sll_epi32(piece.occupied_mask, x_xmm)) };
-        //     self.occupied_mask[y as usize..y as usize + 8].copy_from_slice(
-        //         &unsafe { std::mem::transmute::<_, [u32; 8]>(new_mask) },
-        //     );
-        // } else {
-        //     // here, we instead shift down the piece mask by the number of rows
-        //     // Uses the fact that the 8th row is always empty.
-        //     // If we are shifting by n, the permutation looks like this:
-        //     // (7-n), (7-n-1), ..., 0, 7, 7, ..., 7
-
-        //     // this permutation array is reversed for easy indexing
-        //     let permutation: [i32; 8] = array::from_fn(|i|
-        //         if i < y as usize {
-        //             7
-        //         } else {
-        //             i as i32 - y as i32
-        //         }
-        //     );
-        //     let shape = unsafe {
-        //         _mm256_permutevar8x32_epi32(piece.occupied_mask, _mm256_set_epi32(
-        //             permutation[7], permutation[6], permutation[5], permutation[4],
-        //             permutation[3], permutation[2], permutation[1], permutation[0]
-        //         ))
-        //     };
-
-        //     // Now we can hook up the masks just as we wanted
-        //     let mask = self.occupied_mask[12..20]
-        //     .try_into()
-        //     .unwrap();
-        //     let mask = unsafe { ymm(mask) };
-        //     let new_mask = unsafe { _mm256_or_si256(mask, _mm256_sll_epi32(shape, x_xmm)) };
-        //     self.occupied_mask[12..20].copy_from_slice(
-        //         &unsafe { std::mem::transmute::<_, [u32; 8]>(new_mask) },
-        //     );
-        // }
-
-        let occupied_mask =
-            unsafe { std::mem::transmute::<__m256i, [u32; 8]>(piece.occupied_mask) };
-        for i in 0..piece.height {
-            self.occupied_mask[(y + i) as usize] |= occupied_mask[i as usize] << x;
-        }
-
-        // Update the color and corner masks
-        // safety: we don't care about 1s in the overflowed borders because
-        // if a neighbor is filled in the boarder, its neighbor inside the board will already be filled as well
-        // if a corner is in the boarder, it will never be seen as we only check valid moves in the board
-        if x == 0 {
-            if y == 0 {
-                for i in 0..piece.height as usize + 1 {
-                    self.color_masks[pid][i] |= piece.neighbor_mask[i + 1] >> 1;
-                    self.corner_masks[pid][i] |= piece.corner_mask[i + 1] >> 1;
-                }
-            } else {
-                for i in 0..min(21 - y as usize, piece.height as usize + 2) {
-                    self.color_masks[pid][y as usize + i - 1] |= piece.neighbor_mask[i] >> 1;
-                    self.corner_masks[pid][y as usize + i - 1] |= piece.corner_mask[i] >> 1;
+                for i in overlap_y.0..overlap_y.1 {
+                    neighbors[i] >>= overlap_x.0;
+                    neighbors[i] &= (1 << (overlap_x.1 - overlap_x.0)) - 1;
                 }
             }
-        } else if y == 0 {
-            for i in 0..piece.height as usize + 1 {
-                self.color_masks[pid][i] |= piece.neighbor_mask[i + 1] << (x - 1);
-                self.corner_masks[pid][i] |= piece.corner_mask[i + 1] << (x - 1);
-            }
-        } else {
-            for i in 0..min(21 - y as usize, piece.height as usize + 2) {
-                self.color_masks[pid][y as usize + i - 1] |= piece.neighbor_mask[i] << (x - 1);
-                self.corner_masks[pid][y as usize + i - 1] |= piece.corner_mask[i] << (x - 1);
-            }
         }
-
-        self.player_pieces[pid] &= !PIECES[mv.piece].id_mask;
     }
 }
 
