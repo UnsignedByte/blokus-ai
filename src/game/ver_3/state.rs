@@ -270,7 +270,7 @@ impl Subsquares {
     }
 
     /// Make sure all 16 subsquares containing this bit agree with each other
-    fn check_bit(&self, mask_typ: SubsquareMaskTyp, x: usize, y: usize) -> Result<(), String> {
+    fn check_bit(&self, mask_typ: SubsquareMaskTyp, x: usize, y: usize) -> Result<bool, String> {
         let mask = match mask_typ {
             SubsquareMaskTyp::OccupiedOrColor => &self.occupied_or_color,
             SubsquareMaskTyp::Validcorners => &self.valid_corners,
@@ -310,7 +310,7 @@ impl Subsquares {
             }
         }
 
-        Ok(())
+        Ok(expected.unwrap() == 1)
     }
 
     /// Make sure the entire subsquare mask is conformal
@@ -666,50 +666,30 @@ impl State {
 
 impl Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for x in 0..20 {
-            for y in 0..20 {
-                let cell = (self.subsquares[0].occupied_or_color[20 * y + x] & 1) != 0;
-                write!(f, "{}", if cell { 'X' } else { '-' })?;
-            }
-            writeln!(f)?;
-        }
-
-        Ok(())
+        Debug::fmt(self, f)
     }
 }
 
 impl Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // for player in Player::iter() {
-        //     let pid = usize::from(player);
-        //     let color = player.color();
-        //     writeln!(
-        //         f,
-        //         "Occupied/Color Mask for player {}:",
-        //         color.paint(format!("{}", pid))
-        //     )?;
-        //     self.subsquares[usize::from(player)].iter().for_each(|x| {
-        //         writeln!(
-        //             f,
-        //             "{}",
-        //             color.paint(format!("{:020b}", x & ((1 << 20) - 1)))
-        //         )
-        //         .unwrap();
-        //     });
-        //     writeln!(
-        //         f,
-        //         "Corner Mask for player {}:",
-        //         color.paint(format!("{}", pid))
-        //     )?;
-        //     self.corner_masks[usize::from(player)].iter().for_each(|x| {
-        //         writeln!(
-        //             f,
-        //             "{}",
-        //             color.paint(format!("{:020b}", x & ((1 << 20) - 1)))
-        //         )
-        //         .unwrap();
-        //     });
-        // }
+        for x in 0..20 {
+            for y in 0..20 {
+                let cell = self.subsquares[0]
+                    .check_bit(SubsquareMaskTyp::OccupiedOrColor, x, y)
+                    .unwrap()
+                    && self.subsquares[1]
+                        .check_bit(SubsquareMaskTyp::OccupiedOrColor, x, y)
+                        .unwrap()
+                    && self.subsquares[2]
+                        .check_bit(SubsquareMaskTyp::OccupiedOrColor, x, y)
+                        .unwrap()
+                    && self.subsquares[3]
+                        .check_bit(SubsquareMaskTyp::OccupiedOrColor, x, y)
+                        .unwrap();
+                write!(f, "{}", if cell { 'X' } else { '-' })?;
+            }
+            writeln!(f)?;
+        }
         Ok(())
     }
 }
