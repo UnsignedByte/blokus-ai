@@ -33,3 +33,8 @@ rustflags = ["-Ctarget-cpu=native", "--cfg", "alg_ver=\"3\""]
 opt-level = 3
 debug = 1
 inherits = "release"
+
+
+[profile.dev3]
+rustflags = ["-Ctarget-cpu=native", "--cfg", "alg_ver=\"3\""]
+inherits = "dev"

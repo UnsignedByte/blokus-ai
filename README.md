@@ -2,20 +2,16 @@
 
 ## Run using
 
-- `cargo run --profile=perf`
-- `cargo run --profile=x86`
+- `cargo run --profile=perf1`
+- `cargo run --profile=perf2`
+- ...
 
 ## Perf
 
-### Normal ver
-
-- `cargo build --profile=perf && perf record target/perf/blokus-ai`
-- `perf report`
-
-### AVX ver
-
-- `cargo build --profile=x86 && perf record target/x86/blokus-ai`
-- `perf report`
+```bash
+PERF=1 bash -c 'cargo build --profile=perf$PERF && perf record target/perf$PERF/blokus-ai'
+perf report
+```
 
 ## asm
 

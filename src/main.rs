@@ -26,6 +26,8 @@ fn main() {
 
     let mut stats: Vec<Stats> = Vec::new();
 
+    let debug = cfg!(debug_assertions);
+
     loop {
         let mut game = State::new(20, 20);
 
@@ -37,8 +39,10 @@ fn main() {
                 let moves: Vec<_> = moves;
                 let move_elapsed = now.elapsed();
 
-                // println!("Calculation took {} ns", move_elapsed.as_nanos());
-                // println!("Player {} has {} moves", player, moves.len());
+                if debug {
+                    println!("Calculation took {} ns", move_elapsed.as_nanos());
+                    println!("Player {} has {} moves", player, moves.len());
+                }
 
                 if moves.is_empty() {
                     continue;
@@ -50,7 +54,9 @@ fn main() {
                 let now = Instant::now();
                 game.place_piece(&player, move_);
                 let place_elapsed = now.elapsed();
-                // println!("{:?}", game);
+                if debug {
+                    println!("{:?}", game);
+                }
                 played = true;
 
                 stats.push(Stats {
@@ -71,15 +77,24 @@ fn main() {
             .multiunzip();
 
         println!(
-            "Average move calculation time:\n\tArithmetic:{} ms",
-            arithmetic_mean(&stats.0) / 1000000.,
+            "Average move calculation time:\n\tArithmetic:{} micros",
+            arithmetic_mean(&stats.0) / 1000.,
         );
 
         println!(
-            "Average place calculation time:\n\tArithmetic:{} ms",
-            arithmetic_mean(&stats.1) / 1000000.,
+            "Average place calculation time:\n\tArithmetic:{} micros",
+            arithmetic_mean(&stats.1) / 1000.,
         );
 
-        println!("Average fanout:\n\tGeometric:{}", geometric_mean(&stats.2));
+        println!(
+            "Average fanout:\n\tGeometric:{}\n\tArithmetic:{}",
+            geometric_mean(&stats.2),
+            arithmetic_mean(&stats.2)
+        );
+
+        // don't loop forever if on debug mode
+        if debug {
+            break;
+        }
     }
 }

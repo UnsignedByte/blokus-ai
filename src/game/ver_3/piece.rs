@@ -24,19 +24,21 @@ impl Piece {
         debug_assert!(width <= 4);
         debug_assert!(height <= 4);
 
-        let as_u16 = piece[0] | (piece[1] << 4) | (piece[2] << 8) | (piece[3] << 12);
-        let as_u16 = as_u16 as u16;
+        let as_u16 = piece[0] as u16
+            | ((piece[1] as u16) << 4)
+            | ((piece[2] as u16) << 8)
+            | ((piece[3] as u16) << 12);
 
         let mut neighbor_mask = [0; 6];
         let mut corner_mask = [0; 6];
 
         for x in 0..4 {
             for y in 0..4 {
-                neighbor_mask[y + 1] |= piece[y] << (x + 1);
+                neighbor_mask[y + 1] |= ((piece[y] >> x) & 1) << (x + 1);
                 for dir in Neighbor::iter() {
                     let (nx, ny) = dir + (x as i8, y as i8);
 
-                    neighbor_mask[(ny + 1) as usize] |= piece[ny as usize] << (nx + 1);
+                    neighbor_mask[(ny + 1) as usize] |= ((piece[y] >> x) & 1) << (nx + 1);
                 }
 
                 for corner in Corner::iter() {
@@ -45,8 +47,16 @@ impl Piece {
                     let (cx, cy) = corner + (x, y);
 
                     if (piece[y as usize] >> x) & 1 != 0
-                        && (neighbor_mask[(y + 1) as usize] >> (cx + 1)) & 1 == 0
-                        && (neighbor_mask[(cy + 1) as usize] >> (x + 1)) & 1 == 0
+                        && {
+                            let pre_shift = piece[y as usize];
+                            if cx >= 0 {
+                                pre_shift >> cx
+                            } else {
+                                0
+                            }
+                        } & 1
+                            == 0
+                        && (piece.get(cy as usize).unwrap_or(&0) >> x) & 1 == 0
                     {
                         corner_mask[(cy + 1) as usize] |= 1 << (cx + 1);
                     }
