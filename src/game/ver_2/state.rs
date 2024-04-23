@@ -1,13 +1,12 @@
 use once_cell::sync::Lazy;
 
 use super::{
-    utils::{rotate_down_1, shift_left_1, shift_up_1, ymm},
+    utils::{rotate_down_1, shift_left_1},
     Piece,
 };
-use crate::game::{ver_2::utils::ymm_str, Player};
+use crate::game::Player;
 use std::{
     arch::x86_64::*,
-    array,
     cmp::min,
     fmt::{Debug, Display},
 };
@@ -299,7 +298,6 @@ impl State {
         moves: &mut Vec<Move>,
         pieces: &[Piece; PIECE_COUNT],
         (check0to4, check4to8, check8to12, check12to16): (Checker, Checker, Checker, Checker),
-        player: &Player,
         pieceid: usize,
     ) {
         let piece = &pieces[pieceid];
@@ -369,7 +367,6 @@ impl State {
                 &mut moves,
                 pieces,
                 (check0to4, check4to8, check8to12, check12to16),
-                player,
                 piece,
             );
         }

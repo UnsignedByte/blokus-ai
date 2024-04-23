@@ -170,7 +170,15 @@ impl Debug for Piece {
 
 #[cfg(test)]
 mod tests {
-    use crate::game::ver_2::utils::{ymm, ymm_eq};
+    use crate::game::ver_2::utils::ymm;
+
+    unsafe fn ymm_eq(a: __m256i, b: __m256i) -> bool {
+        // Fills mask with 1 if a and b are equal
+        let mask = _mm256_cmpeq_epi32(a, b);
+        // Take the most significant bit from each 8 bit chunk
+        let ret = _mm256_movemask_epi8(mask);
+        ret == -1
+    }
 
     use super::*;
     #[test]

@@ -1,10 +1,7 @@
 use once_cell::sync::Lazy;
 
-use super::{
-    utils::{rotate_down_1, shift_left_1, shift_up_1, ymm},
-    Piece,
-};
-use crate::game::{ver_3::utils::ymm_str, Player};
+use super::Piece;
+use crate::game::Player;
 use std::{
     arch::x86_64::*,
     array,
@@ -409,8 +406,6 @@ pub struct State {
     player_pieces: [u128; Player::N],
 }
 
-type Checker = (__m256i, __m256i, __m256i);
-
 impl State {
     pub fn new(w: usize, h: usize) -> Self {
         // this implementation is tailored for 20x20
@@ -446,15 +441,15 @@ impl State {
             // Only works for pieces that fit in a 4x4
             if pieces[piece].height <= 4 && pieces[piece].width <= 4 {
                 /*
-                                // CORRECTNESS TEST:
-                                let mut a1 = vec![];
-                                let mut a2 = vec![];
+                // CORRECTNESS TEST:
+                let mut a1 = vec![];
+                let mut a2 = vec![];
 
-                                subsquares[usize::from(player)].test_piece(&mut a2, piece, pieces[piece].as_u16);
-                                self.get_moves_for_piece(&mut a1, pieces, player, piece);
+                subsquares[usize::from(player)].test_piece(&mut a2, piece, pieces[piece].as_u16);
+                self.get_moves_for_piece(&mut a1, pieces, player, piece);
 
-                                a1.sort();
-                                a2.sort();
+                a1.sort();
+                a2.sort();
                 */
                 self.subsquares[usize::from(player)].test_piece(
                     &mut moves,
@@ -470,20 +465,21 @@ impl State {
         // a piece placed at a position
         let piece = &PIECES[mv.piece];
 
-        // println!(
-        //     "Placing at {:?}:\n{}\n{}",
-        //     &mv.pos,
-        //     piece
-        //         .neighbor_mask
-        //         .iter()
-        //         .map(|v| format!("{:06b}", v))
-        //         .fold(String::new(), |acc, v| format!("{}\n{}", acc, v)),
-        //     piece
-        //         .corner_mask
-        //         .iter()
-        //         .map(|v| format!("{:06b}", v))
-        //         .fold(String::new(), |acc, v| format!("{}\n{}", acc, v))
-        // );
+        #[cfg(debug_assertions)]
+        println!(
+            "Placing at {:?}:\n{}\n{}",
+            &mv.pos,
+            piece
+                .neighbor_mask
+                .iter()
+                .map(|v| format!("{:06b}", v))
+                .fold(String::new(), |acc, v| format!("{}\n{}", acc, v)),
+            piece
+                .corner_mask
+                .iter()
+                .map(|v| format!("{:06b}", v))
+                .fold(String::new(), |acc, v| format!("{}\n{}", acc, v))
+        );
         let (x, y) = mv.pos;
 
         let pid = usize::from(player);
@@ -511,44 +507,48 @@ impl State {
             // Range of rows of the piece mask that will be used (y)
             let piece_y_range = (
                 max(0, offset_y - y + 1) as usize, // + 1 bc neighbor / corner masks start at -1
-                (min(0, offset_y - y + 1) + 4) as usize,
+                (min(0, offset_y - y + 1) + 6) as usize,
             );
 
             if piece_y_range.1 <= piece_y_range.0 {
                 continue;
             }
 
-            let piece_y_w = piece_y_range.1 - piece_y_range.0;
-
             // where in this 4x4 mask does the piece mask begin
             let mask_y_start = max(0, y - 1 - offset_y) as usize;
+
+            let piece_y_w = piece_y_range.1 - piece_y_range.0;
+            let piece_y_w = min(4 - mask_y_start, piece_y_w);
 
             // + w + 1 here because the neighbor map reaches to x + w + 1
             for offset_x in max(0, x - 4)..min(20, x + w + 1) {
                 // Range of columns of the piece mask that will be used (x)
                 let piece_x_range = (
                     max(0, offset_x - x + 1) as usize, // + 1 bc neighbor / corner masks start at -1
-                    (min(0, offset_x - x + 1) + 4) as usize,
+                    (min(0, offset_x - x + 1) + 6) as usize,
                 );
 
                 if piece_x_range.1 <= piece_x_range.0 {
                     continue;
                 }
 
-                // Mask for number of cols used
-                let piece_x_w = (1 << (piece_x_range.1 - piece_x_range.0)) - 1;
-
                 // where in this 4x4 mask does the piece mask begin
                 let mask_x_start = max(0, x - 1 - offset_x) as usize;
+
+                // Mask for number of cols used
+                let piece_x_w = piece_x_range.1 - piece_x_range.0;
+                let piece_x_w = min(4 - mask_x_start, piece_x_w);
+                let piece_x_w = (1 << piece_x_w) - 1;
 
                 // which 4x4 mask we are at
                 let mask_idx = offset_y as usize * 20 + offset_x as usize;
 
                 debug_assert!(mask_idx < 400);
 
-                for row in 0..min(piece.height as usize + 2, piece_y_w) {
+                for row in 0..piece_y_w {
                     // where in the mask we are
                     let mask_y = mask_y_start + row;
+                    // println!("{:?}, {:?}", (mask_x_start, mask_y), (piece_x_w, piece_y_w));
                     // Shift right to discard lowest cols
                     let mut nmask = piece.neighbor_mask[row + piece_y_range.0] >> piece_x_range.0;
                     // Keep only (range high - range low) cols
@@ -646,6 +646,8 @@ impl State {
             }
         }
 
+        self.player_pieces[pid] &= !PIECES[mv.piece].id_mask;
+
         // check if on debug
         #[cfg(debug_assertions)]
         self.check()
@@ -672,8 +674,8 @@ impl Display for State {
 
 impl Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for x in 0..20 {
-            for y in 0..20 {
+        for y in 0..20 {
+            for x in 0..20 {
                 let cell = self.subsquares[0]
                     .check_bit(SubsquareMaskTyp::OccupiedOrColor, x, y)
                     .unwrap()
@@ -909,5 +911,72 @@ mod test {
         assert!(game.subsquares[0].valid_corners[22] == 0b00000001);
         assert!(game.subsquares[0].valid_corners[40] == 0b0010);
         assert!(game.subsquares[0].valid_corners[41] == 0b0001);
+    }
+
+    #[test]
+    fn check_place_corner_fat_l() {
+        // Take the
+        // X
+        // X
+        // X
+        // X
+        // piece
+        let piece = 10;
+
+        let mut game = State::new(20, 20);
+        game.check();
+        game.place_piece(&Player::Player1, &Move::new(piece, (0, 16)));
+        // Make sure all the masks are valid
+        game.check();
+        // The masks at the bottom right should look like
+        // (0, 0):
+        // 0001
+        // 0011
+        // 0011
+        // 0011
+        // 0011
+        // 1111
+        // 1111
+        // 1111
+        println!(
+            "{}",
+            PIECES[piece]
+                .neighbor_mask
+                .iter()
+                .map(|v| format!("{:06b}", v))
+                .fold(String::new(), |acc, v| format!("{}\n{}", acc, v))
+        );
+        println!("{}", subsquare_str(&game.subsquares[0].occupied_or_color));
+        assert!(game.subsquares[0].occupied_or_color[19 * 20] == 0b1111111111110011);
+        assert!(game.subsquares[0].occupied_or_color[18 * 20] == 0b1111111100110011);
+        assert!(game.subsquares[0].occupied_or_color[17 * 20] == 0b1111001100110011);
+        assert!(game.subsquares[0].occupied_or_color[16 * 20] == 0b0011001100110011);
+        assert!(game.subsquares[0].occupied_or_color[15 * 20] == 0b0011001100110001);
+        assert!(game.subsquares[0].occupied_or_color[14 * 20] == 0b0011001100010000);
+        assert!(game.subsquares[0].occupied_or_color[13 * 20] == 0b0011000100000000);
+        assert!(game.subsquares[0].occupied_or_color[12 * 20] == 0b0001000000000000);
+        // Corner mask should look like
+        // (0, 0):
+        // 0001
+        // 0100
+        // 0010
+        // 0000
+        println!("{}", subsquare_str(&game.subsquares[0].valid_corners));
+        assert!(game.subsquares[0].valid_corners[19 * 20] == 0b0000000000100000);
+        assert!(game.subsquares[0].valid_corners[18 * 20] == 0b0000001000000000);
+        assert!(game.subsquares[0].valid_corners[17 * 20] == 0b0010000000000000);
+        assert!(game.subsquares[0].valid_corners[16 * 20] == 0);
+        assert!(game.subsquares[0].valid_corners[15 * 20] == 0b0000000000000010);
+        assert!(game.subsquares[0].valid_corners[14 * 20] == 0b0000000000100000);
+        assert!(game.subsquares[0].valid_corners[13 * 20] == 0b0000001000000000);
+        assert!(game.subsquares[0].valid_corners[12 * 20] == 0b0010000000000000);
+        assert!(game.subsquares[0].valid_corners[19 * 20 + 1] == 0b0000000000010000);
+        assert!(game.subsquares[0].valid_corners[18 * 20 + 1] == 0b0000000100000000);
+        assert!(game.subsquares[0].valid_corners[17 * 20 + 1] == 0b0001000000000000);
+        assert!(game.subsquares[0].valid_corners[16 * 20 + 1] == 0);
+        assert!(game.subsquares[0].valid_corners[15 * 20 + 1] == 0b0000000000000001);
+        assert!(game.subsquares[0].valid_corners[14 * 20 + 1] == 0b0000000000010000);
+        assert!(game.subsquares[0].valid_corners[13 * 20 + 1] == 0b0000000100000000);
+        assert!(game.subsquares[0].valid_corners[12 * 20 + 1] == 0b0001000000000000);
     }
 }

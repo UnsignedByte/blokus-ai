@@ -1,7 +1,7 @@
 mod utils;
-mod ver_1;
-mod ver_2;
-mod ver_3;
+pub mod ver_1;
+pub mod ver_2;
+pub mod ver_3;
 
 #[cfg(not(any(alg_ver = "2", alg_ver = "3")))]
 pub use ver_1::*;
