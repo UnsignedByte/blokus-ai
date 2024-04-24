@@ -47,6 +47,11 @@ impl<'t> Tournament<'t> {
 
     /// Run a single game with 4 agents
     pub fn simulate_game(&mut self, agents: [usize; Player::N]) {
+        // skip the game if all the players are the same, as elo will never change
+        if agents.iter().all_equal() {
+            return;
+        }
+
         let mut game = State::new(20, 20);
         let mut alive = true;
         // run as long as a player is still playing
