@@ -431,6 +431,8 @@ pub struct State {
     /// represent whether a player has the piece
     /// on hand or not
     player_pieces: [u128; Player::N],
+    /// Player scores
+    scores: [u8; Player::N],
 }
 
 impl State {
@@ -447,6 +449,7 @@ impl State {
         let s = Self {
             subsquares,
             player_pieces: [(1 << (PIECE_COUNT + 1)) - 1; Player::N], // Players start with all the pieces
+            scores: [0; Player::N],
         };
 
         // check if on debug
@@ -454,6 +457,10 @@ impl State {
         s.check();
 
         s
+    }
+
+    pub fn scores(&self) -> &[u8; Player::N] {
+        &self.scores
     }
 
     /// Get the possible moves for a player
@@ -708,6 +715,8 @@ impl State {
                 }
             }
         }
+        self.player_pieces[pid] &= !(0b11 << PIECE_COUNT);
+        self.scores[pid] += 5;
     }
 
     fn place_5_tall(&mut self, pid: usize, (x, y): (i8, i8)) {
@@ -833,6 +842,9 @@ impl State {
                 }
             }
         }
+
+        self.player_pieces[pid] &= !(0b11 << PIECE_COUNT);
+        self.scores[pid] += 5;
     }
 
     pub fn place_piece(&mut self, player: &Player, mv: &Move) {
@@ -1036,6 +1048,7 @@ impl State {
                 }
 
                 self.player_pieces[pid] &= !PIECES[mv.piece].id_mask;
+                self.scores[pid] += piece_size(mv) as u8;
             }
         }
 

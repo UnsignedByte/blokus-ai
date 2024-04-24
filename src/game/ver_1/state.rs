@@ -128,6 +128,8 @@ pub struct State {
     corners: [[FxHashSet<(i8, i8)>; Corner::N]; Player::N],
     /// Playable pieces for every player
     player_pieces: [Vec<bool>; Player::N],
+    /// Scores for each player
+    scores: [u8; Player::N],
 }
 
 impl State {
@@ -150,7 +152,12 @@ impl State {
             board: Mask::new(w, vec![0; h as usize]),
             corners,
             player_pieces,
+            scores: [0; Player::N],
         }
+    }
+
+    pub fn scores(&self) -> &[u8; Player::N] {
+        &self.scores
     }
 
     fn get_moves_for_piece<'a>(
@@ -246,6 +253,7 @@ impl State {
         self.board = self.board.or(&transformed_piece.mask, (x, y));
         // Remove the piece from the player's pieces
         self.player_pieces[usize::from(player)][usize::from(piece.piece)] = false;
+        self.scores[usize::from(player)] += piece_size(mv) as u8;
 
         // Update the corners
         for (x, y, v) in transformed_piece.tile_iter() {

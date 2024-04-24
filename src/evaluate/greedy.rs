@@ -1,8 +1,8 @@
-use crate::game::piece_size;
-
 use super::Algorithm;
+use crate::game::piece_size;
 use rand::seq::SliceRandom;
 
+#[derive(Default)]
 pub struct Greedy {
     rng: rand::rngs::ThreadRng,
 }
@@ -17,5 +17,9 @@ impl Algorithm for Greedy {
         let mut moves = state.get_moves(player);
         moves.shuffle(&mut self.rng);
         moves.into_iter().max_by_key(piece_size)
+    }
+
+    fn name(&self) -> String {
+        "Greedy".to_owned()
     }
 }

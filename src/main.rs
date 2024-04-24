@@ -101,9 +101,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use blokus_ai::game::ver_1::Move as Move1;
     use blokus_ai::game::ver_1::State as State1;
-    use blokus_ai::game::ver_3::Move as Move3;
     use blokus_ai::game::ver_3::State as State3;
     use blokus_ai::game::Player;
 
@@ -112,8 +110,8 @@ mod test {
         // make sure move counts match across algorithms
         // only checking version 2 and 3 because they have the same indexing method and also don't have 5 tall/wide pieces
 
-        let mut game1 = State1::new(20, 20);
-        let mut game3 = State3::new(20, 20);
+        let game1 = State1::new(20, 20);
+        let game3 = State3::new(20, 20);
 
         for player in Player::iter() {
             let moves1 = game1.get_moves(&player);
@@ -123,18 +121,5 @@ mod test {
 
             assert!(moves1.len() == moves3.len());
         }
-
-        // // Place piece
-        // // XX
-        // //  X
-        // game1.place_piece(&Player::Player1, &Move1::new(PieceTransformID { piece: (), version: () }, (0, 0)));
-        // game3.place_piece(&Player::Player1, &Move3::new(5, (0, 0)));
-
-        // for player in Player::iter() {
-        //     let moves2 = game1.get_moves(&player);
-        //     let moves3 = game3.get_moves(&player);
-
-        //     assert!(moves2.len() == moves3.len());
-        // }
     }
 }

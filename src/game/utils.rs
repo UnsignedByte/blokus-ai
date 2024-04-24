@@ -182,7 +182,7 @@ impl Add<(i8, i8)> for Neighbor {
 }
 
 /// Enum for every player.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Player {
     Player1,
     Player2,
