@@ -1,14 +1,19 @@
-use blokus_ai::evaluate::{Algorithm, Greedy, Mix, Random, Tournament};
+use blokus_ai::evaluate::{Greedy, Mix, Random, Tournament};
 use std::fmt::Write;
+use std::time::Instant;
 
 fn main() {
-    let mut greedy = Greedy::default();
-    let mut random = Random::default();
-    let mut greedy_random_mix = Mix::new(Greedy::default(), Random::default(), 0.5);
-    let mut tournament = Tournament::new(vec![&mut greedy, &mut random, &mut greedy_random_mix]);
+    let mut a = Greedy::default();
+    let mut b = Random::default();
+    let mut c = Mix::new(Greedy::default(), Random::default(), 0.25);
+    let mut d = Mix::new(Greedy::default(), Random::default(), 0.5);
+    let mut e = Mix::new(Greedy::default(), Random::default(), 0.75);
+    let mut tournament = Tournament::new(vec![&mut b, &mut c, &mut d, &mut e, &mut a]);
 
     loop {
+        let now = Instant::now();
         tournament.round_robin();
+        println!("Round robin took {} ms", now.elapsed().as_millis());
 
         let scores = tournament
             .scores()
