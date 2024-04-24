@@ -266,6 +266,20 @@ impl Subsquares {
         }
     }
 
+    // used in the 5x1 / 1x5 case
+    #[inline]
+    fn get_unchecked(&self, mask_typ: SubsquareMaskTyp, x: usize, y: usize) -> Option<bool> {
+        if x < 20 && y < 20 {
+            let mask = match mask_typ {
+                SubsquareMaskTyp::OccupiedOrColor => &self.occupied_or_color,
+                SubsquareMaskTyp::Validcorners => &self.valid_corners,
+            };
+            Some(mask[y * 20 + x] & 1 != 0)
+        } else {
+            None
+        }
+    }
+
     /// Make sure all 16 subsquares containing this bit agree with each other
     fn check_bit(&self, mask_typ: SubsquareMaskTyp, x: usize, y: usize) -> Result<bool, String> {
         let mask = match mask_typ {
@@ -419,7 +433,7 @@ impl State {
 
         let s = Self {
             subsquares,
-            player_pieces: [(1 << PIECE_COUNT) - 1; Player::N], // Players start with all the pieces
+            player_pieces: [(1 << (PIECE_COUNT + 1)) - 1; Player::N], // Players start with all the pieces
         };
 
         // check if on debug
@@ -438,76 +452,127 @@ impl State {
         for piece in (0..PIECE_COUNT)
             .filter(move |f| (1 << *f) & self.player_pieces[usize::from(player)] != 0)
         {
-            // Only works for pieces that fit in a 4x4
-            if pieces[piece].height <= 4 && pieces[piece].width <= 4 {
-                /*
-                // CORRECTNESS TEST:
-                let mut a1 = vec![];
-                let mut a2 = vec![];
+            /*
+            // CORRECTNESS TEST:
+            let mut a1 = vec![];
+            let mut a2 = vec![];
 
-                subsquares[usize::from(player)].test_piece(&mut a2, piece, pieces[piece].as_u16);
-                self.get_moves_for_piece(&mut a1, pieces, player, piece);
+            subsquares[usize::from(player)].test_piece(&mut a2, piece, pieces[piece].as_u16);
+            self.get_moves_for_piece(&mut a1, pieces, player, piece);
 
-                a1.sort();
-                a2.sort();
-                */
-                self.subsquares[usize::from(player)].test_piece(
-                    &mut moves,
-                    piece,
-                    pieces[piece].as_u16,
-                );
+            a1.sort();
+            a2.sort();
+            */
+            let old_len = moves.len();
+            self.subsquares[usize::from(player)].test_piece(
+                &mut moves,
+                piece,
+                pieces[piece].as_u16,
+            );
+
+            // Special case for 5 wide or 5 tall
+            if pieces[piece].width == 4
+                && pieces[piece].height == 1
+                && (1 << PIECE_COUNT) & self.player_pieces[usize::from(player)] != 0
+            {
+                // println!("Wide, {} to {}", old_len, moves.len());
+                // Loop through all 4x1 moves and check if the tile to the left
+                // is empty
+
+                let ss = &self.subsquares[usize::from(player)];
+
+                for mv_i in old_len..moves.len() {
+                    let Move {
+                        piece: _,
+                        pos: (x, y),
+                    } = &moves[mv_i];
+
+                    let (x, y) = (*x as usize, *y as usize);
+
+                    // There are two cases to check for every move
+                    //     v space for extra tile
+                    // XXXX+
+                    // ^ corner here
+                    // v space for extra tile
+                    // +XXXX
+                    //     ^ corner here
+                    // note that only one of these can ever be true
+
+                    if
+                    // (x, y) is a corner
+                    ss.get_unchecked(SubsquareMaskTyp::Validcorners, x, y).unwrap() // never out of bounds here
+                        // (x + 4, y) is empty
+                        && !ss.get_unchecked(SubsquareMaskTyp::OccupiedOrColor, x + 4, y)
+                                .unwrap_or(true)
+                    // treat out of bounds as full
+                    {
+                        moves.push(Move::new(PIECE_COUNT, (x as i8, y as i8)))
+                    } else if
+                    // (x+3, y) is a corner
+                    ss.get_unchecked(SubsquareMaskTyp::Validcorners, x+3, y).unwrap() // never out of bounds 
+                    // (x - 1, y) is empty
+                    && x > 0 && !ss.get_unchecked(SubsquareMaskTyp::OccupiedOrColor, x - 1, y)
+                            .unwrap_or(true)
+                    // treat out of bounds as full
+                    {
+                        moves.push(Move::new(PIECE_COUNT, (x as i8 - 1, y as i8)))
+                    }
+                }
+            } else if pieces[piece].width == 1
+                && pieces[piece].height == 4
+                // we check the 5x1 here instead because using the 5x1 also uses the 1x5
+                // and the compiler thus only has to calculate this once.
+                && (1 << PIECE_COUNT) & self.player_pieces[usize::from(player)] != 0
+            {
+                let ss = &self.subsquares[usize::from(player)];
+
+                for mv_i in old_len..moves.len() {
+                    let Move {
+                        piece: _,
+                        pos: (x, y),
+                    } = &moves[mv_i];
+
+                    let (x, y) = (*x as usize, *y as usize);
+
+                    if ss.get_unchecked(SubsquareMaskTyp::Validcorners, x, y).unwrap() // never out of bounds here
+                        && !ss.get_unchecked(SubsquareMaskTyp::OccupiedOrColor, x, y + 4)
+                                .unwrap_or(true)
+                    // treat out of bounds as full
+                    {
+                        moves.push(Move::new(PIECE_COUNT + 1, (x as i8, y as i8)))
+                    } else if ss.get_unchecked(SubsquareMaskTyp::Validcorners, x, y + 3).unwrap() // never out of bounds 
+                    && y > 0 && !ss.get_unchecked(SubsquareMaskTyp::OccupiedOrColor, x, y - 1)
+                            .unwrap_or(true)
+                    // treat out of bounds as full
+                    {
+                        moves.push(Move::new(PIECE_COUNT + 1, (x as i8, y as i8 - 1)))
+                    }
+                }
             }
         }
         moves
     }
 
-    pub fn place_piece(&mut self, player: &Player, mv: &Move) {
-        // a piece placed at a position
-        let piece = &PIECES[mv.piece];
-
-        #[cfg(debug_assertions)]
-        println!(
-            "Placing at {:?}:\n{}\n{}",
-            &mv.pos,
-            piece
-                .neighbor_mask
-                .iter()
-                .map(|v| format!("{:06b}", v))
-                .fold(String::new(), |acc, v| format!("{}\n{}", acc, v)),
-            piece
-                .corner_mask
-                .iter()
-                .map(|v| format!("{:06b}", v))
-                .fold(String::new(), |acc, v| format!("{}\n{}", acc, v))
-        );
-        let (x, y) = mv.pos;
-
-        let pid = usize::from(player);
-
-        let (w, h) = (piece.width, piece.height);
-
-        // Each piece has a 4x4 mask and a 6x6 neighbor mask
-        // So therefore it influences up to a 12x12 square of 144 different masks
-        // We need to update the occupied_or_color and corner masks for each of these subsquares
-        // XXXXXXXXXXXX
-        // XXXXXXXXXXXX
-        // XXXXXXXXXXXX
-        // XXX??????XXX
-        // XXX?****?XXX
-        // XXX?****?XXX
-        // XXX?****?XXX
-        // XXX?****?XXX
-        // XXX??????XXX
-        // XXXXXXXXXXXX
-        // XXXXXXXXXXXX
-        // XXXXXXXXXXXX
+    /// Moved to another function so the main function is not so big
+    fn place_5_wide(&mut self, pid: usize, (x, y): (i8, i8)) {
+        // 5 wide
+        // XXXXXXXXXXXXX
+        // XXXXXXXXXXXXX
+        // XXXXXXXXXXXXX
+        // XXX???????XXX
+        // XXX?*****?XXX
+        // XXX???????XXX
+        // XXXXXXXXXXXXX
+        // XXXXXXXXXXXXX
+        // XXXXXXXXXXXXX
         // + h + 1 here because the neighbor map reaches to y + h + 1
-        for offset_y in max(0, y - 4)..min(20, y + h + 1) {
+        for offset_y in max(0, y - 4)..min(20, y + 2) {
             // same calculations for y
             // Range of rows of the piece mask that will be used (y)
             let piece_y_range = (
                 max(0, offset_y - y + 1) as usize, // + 1 bc neighbor / corner masks start at -1
-                (min(0, offset_y - y + 1) + 6) as usize,
+                // 5 wide, 1 tall - neighbor is 7 wide, 3 tall
+                min(3, offset_y - y + 1 + 4) as usize,
             );
 
             if piece_y_range.1 <= piece_y_range.0 {
@@ -521,11 +586,11 @@ impl State {
             let piece_y_w = min(4 - mask_y_start, piece_y_w);
 
             // + w + 1 here because the neighbor map reaches to x + w + 1
-            for offset_x in max(0, x - 4)..min(20, x + w + 1) {
+            for offset_x in max(0, x - 4)..min(20, x + 5 + 1) {
                 // Range of columns of the piece mask that will be used (x)
                 let piece_x_range = (
                     max(0, offset_x - x + 1) as usize, // + 1 bc neighbor / corner masks start at -1
-                    (min(0, offset_x - x + 1) + 6) as usize,
+                    (min(7, offset_x - x + 1 + 4)) as usize,
                 );
 
                 if piece_x_range.1 <= piece_x_range.0 {
@@ -550,7 +615,11 @@ impl State {
                     let mask_y = mask_y_start + row;
                     // println!("{:?}, {:?}", (mask_x_start, mask_y), (piece_x_w, piece_y_w));
                     // Shift right to discard lowest cols
-                    let mut nmask = piece.neighbor_mask[row + piece_y_range.0] >> piece_x_range.0;
+                    let mut nmask = match row + piece_y_range.0 {
+                        0 | 2 => (1 << 6) - 2,
+                        1 => (1 << 7) - 1,
+                        _ => unreachable!("Reading invalid row"),
+                    } >> piece_x_range.0;
                     // Keep only (range high - range low) cols
                     nmask &= piece_x_w;
                     let nmask = nmask as u16;
@@ -559,7 +628,11 @@ impl State {
                         nmask << (mask_y * 4 + mask_x_start);
 
                     // now do the same for corners
-                    let mut cmask = piece.corner_mask[row + piece_y_range.0] >> piece_x_range.0;
+                    let mut cmask = match row + piece_y_range.0 {
+                        0 | 2 => 1 | (1 << 6),
+                        1 => 0,
+                        _ => unreachable!("Reading invalid row"),
+                    } >> piece_x_range.0;
                     // Keep only (range high - range low) cols
                     cmask &= piece_x_w;
                     let cmask = cmask as u16;
@@ -569,51 +642,28 @@ impl State {
             }
         }
 
-        // Now, deal with the occupation masks of all the other players
-        // Each piece has a 4x4 mask and a 4x4 occupation mask
-        // So therefore it influences up to a 10x10 square of 100 different masks
-        // We need to update the occupied_or_color
-        // XXXXXXXXXX
-        // XXXXXXXXXX
-        // XXX****XXX
-        // XXX****XXX
-        // XXX****XXX
-        // XXX****XXX
-        // XXXXXXXXXX
-        // XXXXXXXXXX
+        // XXXXXXXXXXX
+        // XXXXXXXXXXX
+        // XXX*****XXX
+        // XXXXXXXXXXX
+        // XXXXXXXXXXX
         // masks for x -
-        let x_masks = [
-            0b0001000100010001, // 1 only
-            0b0011001100110011, // 2 only
-            0b0111011101110111, // 3 only
-            0b1111111111111111, // 4
-        ];
         for opid in 0..4 {
             if opid == pid {
                 continue;
             }
-            // 0..2
-            // y = 1
-            for offset_y in max(0, y - 3)..min(20, y + h) {
-                // same calculations for y
-                // Range of rows of the piece mask that will be used (y)
-                let piece_y_range = (
-                    max(0, offset_y - y) as usize,
-                    (min(0, offset_y - y) + 4) as usize,
-                );
-
-                if piece_y_range.1 <= piece_y_range.0 {
-                    continue;
-                }
+            for offset_y in max(0, y - 3)..(y + 1) {
+                // only one row
 
                 // where in this 4x4 mask does the piece mask begin
-                let mask_y_start = max(0, y - offset_y);
+                let mask_y_start = max(0, y - offset_y) as usize;
 
-                for offset_x in max(0, x - 3)..min(20, x + w) {
+                // + w + 1 here because the neighbor map reaches to x + w + 1
+                for offset_x in max(0, x - 3)..min(20, x + 5) {
                     // Range of columns of the piece mask that will be used (x)
                     let piece_x_range = (
-                        max(0, offset_x - x) as usize,
-                        (min(0, offset_x - x) + 4) as usize,
+                        max(0, offset_x - x) as usize, // + 1 bc neighbor / corner masks start at -1
+                        (min(5, offset_x - x + 4)) as usize,
                     );
 
                     if piece_x_range.1 <= piece_x_range.0 {
@@ -621,32 +671,360 @@ impl State {
                     }
 
                     // where in this 4x4 mask does the piece mask begin
-                    let mask_x_start = max(0, x - offset_x);
+                    let mask_x_start = max(0, x - offset_x) as usize;
+
+                    // Mask for number of cols used
+                    let piece_x_w = piece_x_range.1 - piece_x_range.0;
+                    let piece_x_w = min(4 - mask_x_start, piece_x_w);
+                    let piece_x_w = (1 << piece_x_w) - 1;
 
                     // which 4x4 mask we are at
                     let mask_idx = offset_y as usize * 20 + offset_x as usize;
 
-                    // Mask for number of cols used
-                    let piece_x_w = x_masks[piece_x_range.1 - piece_x_range.0 - 1];
-                    // mask for the number of rows used
-                    let piece_y_w = ((1 << ((piece_y_range.1 - piece_y_range.0) * 4)) - 1) as u16;
+                    debug_assert!(mask_idx < 400);
 
-                    let mut mask = piece.as_u16;
-                    mask >>= piece_y_range.0 * 4 + piece_x_range.0;
-                    // cancel out the extra cols
-                    mask &= piece_x_w;
-                    // cancel out the extra rows
-                    mask &= piece_y_w;
+                    // println!("{:?}, {:?}", (mask_x_start, mask_y), (piece_x_w, piece_y_w));
+                    // Shift right to discard lowest cols
+                    let mut nmask = (1 << 5) - 1;
+                    // Keep only (range high - range low) cols
+                    nmask &= piece_x_w;
+                    let nmask = nmask as u16;
+                    // shift left by y * 4 + x as this is a 4x4 mask in a u16
+                    self.subsquares[opid].occupied_or_color[mask_idx] |=
+                        nmask << (mask_y_start * 4 + mask_x_start);
+                }
+            }
+        }
+    }
 
-                    // shift the mask so its aligned with the current 4x4 mask
-                    mask <<= mask_y_start * 4 + mask_x_start;
+    fn place_5_tall(&mut self, pid: usize, (x, y): (i8, i8)) {
+        // + h + 1 here because the neighbor map reaches to y + h + 1
+        for offset_y in max(0, y - 4)..min(20, y + 5 + 1) {
+            // same calculations for y
+            // Range of rows of the piece mask that will be used (y)
+            let piece_y_range = (
+                max(0, offset_y - y + 1) as usize, // + 1 bc neighbor / corner masks start at -1
+                // 5 wide, 1 tall - neighbor is 7 wide, 3 tall
+                min(7, offset_y - y + 1 + 4) as usize,
+            );
 
-                    self.subsquares[opid].occupied_or_color[mask_idx] |= mask;
+            if piece_y_range.1 <= piece_y_range.0 {
+                continue;
+            }
+
+            // where in this 4x4 mask does the piece mask begin
+            let mask_y_start = max(0, y - 1 - offset_y) as usize;
+
+            let piece_y_w = piece_y_range.1 - piece_y_range.0;
+            let piece_y_w = min(4 - mask_y_start, piece_y_w);
+
+            // + w + 1 here because the neighbor map reaches to x + w + 1
+            for offset_x in max(0, x - 4)..min(20, x + 1 + 1) {
+                // Range of columns of the piece mask that will be used (x)
+                let piece_x_range = (
+                    max(0, offset_x - x + 1) as usize, // + 1 bc neighbor / corner masks start at -1
+                    min(3, offset_x - x + 1 + 4) as usize,
+                );
+
+                if piece_x_range.1 <= piece_x_range.0 {
+                    continue;
+                }
+
+                // where in this 4x4 mask does the piece mask begin
+                let mask_x_start = max(0, x - 1 - offset_x) as usize;
+
+                // Mask for number of cols used
+                let piece_x_w = piece_x_range.1 - piece_x_range.0;
+                let piece_x_w = min(4 - mask_x_start, piece_x_w);
+                let piece_x_w = (1 << piece_x_w) - 1;
+
+                // which 4x4 mask we are at
+                let mask_idx = offset_y as usize * 20 + offset_x as usize;
+
+                debug_assert!(mask_idx < 400);
+
+                for row in 0..piece_y_w {
+                    // where in the mask we are
+                    let mask_y = mask_y_start + row;
+                    // println!("{:?}, {:?}", (mask_x_start, mask_y), (piece_x_w, piece_y_w));
+                    // Shift right to discard lowest cols
+                    let mut nmask = match row + piece_y_range.0 {
+                        0 | 6 => 0b010,
+                        1..=5 => 0b111,
+                        _ => unreachable!("Reading invalid row"),
+                    } >> piece_x_range.0;
+                    // Keep only (range high - range low) cols
+                    nmask &= piece_x_w;
+                    let nmask = nmask as u16;
+                    // shift left by y * 4 + x as this is a 4x4 mask in a u16
+                    self.subsquares[pid].occupied_or_color[mask_idx] |=
+                        nmask << (mask_y * 4 + mask_x_start);
+
+                    // now do the same for corners
+                    let mut cmask = match row + piece_y_range.0 {
+                        0 | 6 => 0b101,
+                        1..=5 => 0,
+                        _ => unreachable!("Reading invalid row"),
+                    } >> piece_x_range.0;
+                    // Keep only (range high - range low) cols
+                    cmask &= piece_x_w;
+                    let cmask = cmask as u16;
+                    self.subsquares[pid].valid_corners[mask_idx] |=
+                        cmask << (mask_y * 4 + mask_x_start);
                 }
             }
         }
 
-        self.player_pieces[pid] &= !PIECES[mv.piece].id_mask;
+        // masks for x -
+        for opid in 0..4 {
+            if opid == pid {
+                continue;
+            }
+            for offset_y in max(0, y - 3)..min(20, y + 5) {
+                // Range of columns of the piece mask that will be used (x)
+                let piece_y_range = (
+                    max(0, offset_y - y) as usize,
+                    min(5, offset_y - y + 4) as usize,
+                );
+
+                if piece_y_range.1 <= piece_y_range.0 {
+                    continue;
+                }
+                // where in this 4x4 mask does the piece mask begin
+                let mask_y_start = max(0, y - offset_y) as usize;
+
+                // Mask for number of cols used
+                let piece_y_w = piece_y_range.1 - piece_y_range.0;
+                let piece_y_w = min(4 - mask_y_start, piece_y_w);
+                let piece_y_w = (1 << (piece_y_w * 4)) - 1;
+
+                // + w + 1 here because the neighbor map reaches to x + w + 1
+                for offset_x in max(0, x - 3)..(x + 1) {
+                    // where in this 4x4 mask does the piece mask begin
+                    let mask_x_start = max(0, x - offset_x) as usize;
+
+                    // which 4x4 mask we are at
+                    let mask_idx = offset_y as usize * 20 + offset_x as usize;
+
+                    debug_assert!(mask_idx < 400);
+
+                    // println!("{:?}, {:?}", (mask_x_start, mask_y), (piece_x_w, piece_y_w));
+                    // Shift right to discard lowest cols
+                    let mut nmask = 0b00010001000100010001 >> (piece_y_range.0 * 4);
+                    // Keep only (range high - range low) rows
+                    nmask &= piece_y_w;
+                    let nmask = nmask as u16;
+                    // shift left by y * 4 + x as this is a 4x4 mask in a u16
+                    self.subsquares[opid].occupied_or_color[mask_idx] |=
+                        nmask << (mask_y_start * 4 + mask_x_start);
+                }
+            }
+        }
+    }
+
+    pub fn place_piece(&mut self, player: &Player, mv: &Move) {
+        let (x, y) = mv.pos;
+        let pid = usize::from(player);
+
+        const PC1: usize = PIECE_COUNT + 1;
+        match mv.piece {
+            PIECE_COUNT => {
+                #[cfg(debug_assertions)]
+                println!("Placing wide {:?}", &mv.pos);
+                self.place_5_wide(pid, (x, y))
+            }
+            PC1 => {
+                #[cfg(debug_assertions)]
+                println!("Placing tall {:?}", &mv.pos);
+                self.place_5_tall(pid, (x, y))
+            }
+            pieceid => {
+                // a piece placed at a position
+                let piece = &PIECES[pieceid];
+                #[cfg(debug_assertions)]
+                println!(
+                    "Placing at {:?}:\n{}\n{}",
+                    &mv.pos,
+                    piece
+                        .neighbor_mask
+                        .iter()
+                        .map(|v| format!("{:06b}", v))
+                        .fold(String::new(), |acc, v| format!("{}\n{}", acc, v)),
+                    piece
+                        .corner_mask
+                        .iter()
+                        .map(|v| format!("{:06b}", v))
+                        .fold(String::new(), |acc, v| format!("{}\n{}", acc, v))
+                );
+
+                let (w, h) = (piece.width, piece.height);
+
+                // Each piece has a 4x4 mask and a 6x6 neighbor mask
+                // So therefore it influences up to a 12x12 square of 144 different masks
+                // We need to update the occupied_or_color and corner masks for each of these subsquares
+                // XXXXXXXXXXXX
+                // XXXXXXXXXXXX
+                // XXXXXXXXXXXX
+                // XXX??????XXX
+                // XXX?****?XXX
+                // XXX?****?XXX
+                // XXX?****?XXX
+                // XXX?****?XXX
+                // XXX??????XXX
+                // XXXXXXXXXXXX
+                // XXXXXXXXXXXX
+                // XXXXXXXXXXXX
+                // + h + 1 here because the neighbor map reaches to y + h + 1
+                for offset_y in max(0, y - 4)..min(20, y + h + 1) {
+                    // same calculations for y
+                    // Range of rows of the piece mask that will be used (y)
+                    let piece_y_range = (
+                        max(0, offset_y - y + 1) as usize, // + 1 bc neighbor / corner masks start at -1
+                        min(piece.height + 2, offset_y - y + 1 + 4) as usize,
+                    );
+
+                    if piece_y_range.1 <= piece_y_range.0 {
+                        continue;
+                    }
+
+                    // where in this 4x4 mask does the piece mask begin
+                    let mask_y_start = max(0, y - 1 - offset_y) as usize;
+
+                    let piece_y_w = piece_y_range.1 - piece_y_range.0;
+                    let piece_y_w = min(4 - mask_y_start, piece_y_w);
+
+                    // + w + 1 here because the neighbor map reaches to x + w + 1
+                    for offset_x in max(0, x - 4)..min(20, x + w + 1) {
+                        // Range of columns of the piece mask that will be used (x)
+                        let piece_x_range = (
+                            max(0, offset_x - x + 1) as usize, // + 1 bc neighbor / corner masks start at -1
+                            min(piece.width + 2, offset_x - x + 1 + 4) as usize,
+                        );
+
+                        if piece_x_range.1 <= piece_x_range.0 {
+                            continue;
+                        }
+
+                        // where in this 4x4 mask does the piece mask begin
+                        let mask_x_start = max(0, x - 1 - offset_x) as usize;
+
+                        // Mask for number of cols used
+                        let piece_x_w = piece_x_range.1 - piece_x_range.0;
+                        let piece_x_w = min(4 - mask_x_start, piece_x_w);
+                        let piece_x_w = (1 << piece_x_w) - 1;
+
+                        // which 4x4 mask we are at
+                        let mask_idx = offset_y as usize * 20 + offset_x as usize;
+
+                        debug_assert!(mask_idx < 400);
+
+                        for row in 0..piece_y_w {
+                            // where in the mask we are
+                            let mask_y = mask_y_start + row;
+                            // println!("{:?}, {:?}", (mask_x_start, mask_y), (piece_x_w, piece_y_w));
+                            // Shift right to discard lowest cols
+                            let mut nmask =
+                                piece.neighbor_mask[row + piece_y_range.0] >> piece_x_range.0;
+                            // Keep only (range high - range low) cols
+                            nmask &= piece_x_w;
+                            let nmask = nmask as u16;
+                            // shift left by y * 4 + x as this is a 4x4 mask in a u16
+                            self.subsquares[pid].occupied_or_color[mask_idx] |=
+                                nmask << (mask_y * 4 + mask_x_start);
+
+                            // now do the same for corners
+                            let mut cmask =
+                                piece.corner_mask[row + piece_y_range.0] >> piece_x_range.0;
+                            // Keep only (range high - range low) cols
+                            cmask &= piece_x_w;
+                            let cmask = cmask as u16;
+                            self.subsquares[pid].valid_corners[mask_idx] |=
+                                cmask << (mask_y * 4 + mask_x_start);
+                        }
+                    }
+                }
+
+                // Now, deal with the occupation masks of all the other players
+                // Each piece has a 4x4 mask and a 4x4 occupation mask
+                // So therefore it influences up to a 10x10 square of 100 different masks
+                // We need to update the occupied_or_color
+                // XXXXXXXXXX
+                // XXXXXXXXXX
+                // XXX****XXX
+                // XXX****XXX
+                // XXX****XXX
+                // XXX****XXX
+                // XXXXXXXXXX
+                // XXXXXXXXXX
+                // masks for x -
+                let x_masks = [
+                    0b0001000100010001, // 1 only
+                    0b0011001100110011, // 2 only
+                    0b0111011101110111, // 3 only
+                    0b1111111111111111, // 4
+                ];
+                for opid in 0..4 {
+                    if opid == pid {
+                        continue;
+                    }
+                    // 0..2
+                    // y = 1
+                    for offset_y in max(0, y - 3)..min(20, y + h) {
+                        // same calculations for y
+                        // Range of rows of the piece mask that will be used (y)
+                        let piece_y_range = (
+                            max(0, offset_y - y) as usize,
+                            min(piece.height, offset_y - y + 4) as usize,
+                        );
+
+                        if piece_y_range.1 <= piece_y_range.0 {
+                            continue;
+                        }
+
+                        // where in this 4x4 mask does the piece mask begin
+                        let mask_y_start = max(0, y - offset_y);
+
+                        for offset_x in max(0, x - 3)..min(20, x + w) {
+                            // Range of columns of the piece mask that will be used (x)
+                            let piece_x_range = (
+                                max(0, offset_x - x) as usize,
+                                min(piece.width, offset_x - x + 4) as usize,
+                            );
+
+                            if piece_x_range.1 <= piece_x_range.0 {
+                                continue;
+                            }
+
+                            // where in this 4x4 mask does the piece mask begin
+                            let mask_x_start = max(0, x - offset_x);
+
+                            // which 4x4 mask we are at
+                            let mask_idx = offset_y as usize * 20 + offset_x as usize;
+
+                            // Mask for number of cols used
+                            let piece_x_w = x_masks[piece_x_range.1 - piece_x_range.0 - 1];
+                            // mask for the number of rows used
+                            let piece_y_w =
+                                ((1 << ((piece_y_range.1 - piece_y_range.0) * 4)) - 1) as u16;
+
+                            let mut mask = piece.as_u16;
+                            mask >>= piece_y_range.0 * 4 + piece_x_range.0;
+                            // cancel out the extra cols
+                            mask &= piece_x_w;
+                            // cancel out the extra rows
+                            mask &= piece_y_w;
+
+                            // shift the mask so its aligned with the current 4x4 mask
+                            mask <<= mask_y_start * 4 + mask_x_start;
+
+                            self.subsquares[opid].occupied_or_color[mask_idx] |= mask;
+                        }
+                    }
+                }
+
+                self.player_pieces[pid] &= !PIECES[mv.piece].id_mask;
+            }
+        }
 
         // check if on debug
         #[cfg(debug_assertions)]
@@ -978,5 +1356,80 @@ mod test {
         assert!(game.subsquares[0].valid_corners[14 * 20 + 1] == 0b0000000000010000);
         assert!(game.subsquares[0].valid_corners[13 * 20 + 1] == 0b0000000100000000);
         assert!(game.subsquares[0].valid_corners[12 * 20 + 1] == 0b0001000000000000);
+    }
+    #[test]
+    fn check_place_corner_wide() {
+        // Take the
+        // XXXXX
+        // piece
+        let piece = PIECE_COUNT;
+
+        let mut game = State::new(20, 20);
+        game.check();
+        game.place_piece(&Player::Player1, &Move::new(piece, (1, 1)));
+        // Make sure all the masks are valid
+        game.check();
+
+        println!("{}", subsquare_str(&game.subsquares[1].occupied_or_color));
+        assert!(game.subsquares[1].occupied_or_color[0] == 0b11100000);
+        assert!(game.subsquares[1].occupied_or_color[1] == 0b11110000);
+        assert!(game.subsquares[1].occupied_or_color[2] == 0b11110000);
+        assert!(game.subsquares[1].occupied_or_color[3] == 0b01110000);
+
+        println!("{}", subsquare_str(&game.subsquares[0].valid_corners));
+        assert!(game.subsquares[0].valid_corners[0] == 0b000100000001);
+        assert!(game.subsquares[0].valid_corners[1] == 0);
+        assert!(game.subsquares[0].valid_corners[2] == 0);
+        assert!(game.subsquares[0].valid_corners[3] == 0b100000001000);
+    }
+    #[test]
+    fn check_place_corner_tall() {
+        // Take the
+        // XXXXX
+        // piece
+        let piece = PIECE_COUNT + 1;
+
+        let mut game = State::new(20, 20);
+        game.check();
+        game.place_piece(&Player::Player1, &Move::new(piece, (1, 1)));
+        // Make sure all the masks are valid
+        game.check();
+
+        println!("{}", subsquare_str(&game.subsquares[1].occupied_or_color));
+        assert!(game.subsquares[1].occupied_or_color[0] == 0b0010001000100000);
+        assert!(game.subsquares[1].occupied_or_color[20] == 0b0010001000100010);
+        assert!(game.subsquares[1].occupied_or_color[40] == 0b0010001000100010);
+        assert!(game.subsquares[1].occupied_or_color[60] == 0b0000001000100010);
+
+        println!("{}", subsquare_str(&game.subsquares[0].valid_corners));
+        assert!(game.subsquares[0].valid_corners[0] == 0b101);
+        assert!(game.subsquares[0].valid_corners[20] == 0);
+        assert!(game.subsquares[0].valid_corners[40] == 0);
+        assert!(game.subsquares[0].valid_corners[60] == 0b101000000000000);
+    }
+    #[test]
+    fn check_place_rand_tall() {
+        // Take the
+        // XXXXX
+        // piece
+        let piece = PIECE_COUNT + 1;
+
+        let mut game = State::new(20, 20);
+        game.check();
+        game.place_piece(&Player::Player1, &Move::new(piece, (17, 9)));
+        // Make sure all the masks are valid
+        game.check();
+
+        println!("{}", subsquare_str(&game.subsquares[1].occupied_or_color));
+        assert!(game.subsquares[1].occupied_or_color[0] == 0b0010001000100000);
+        assert!(game.subsquares[1].occupied_or_color[20] == 0b0010001000100010);
+        assert!(game.subsquares[1].occupied_or_color[40] == 0b0010001000100010);
+        assert!(game.subsquares[1].occupied_or_color[60] == 0b0000001000100010);
+
+        println!("{}", subsquare_str(&game.subsquares[0].valid_corners));
+        assert!(game.subsquares[0].valid_corners[0] == 0b101);
+        assert!(game.subsquares[0].valid_corners[20] == 0);
+        assert!(game.subsquares[0].valid_corners[40] == 0);
+        assert!(game.subsquares[0].valid_corners[60] == 0b101000000000000);
     }
 }
