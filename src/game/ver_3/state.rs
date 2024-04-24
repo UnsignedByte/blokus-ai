@@ -152,9 +152,10 @@ pub static PIECES: Lazy<[Piece; PIECE_COUNT]> = Lazy::new(|| {
     ]
 });
 
-/// Abstracted function to get size from a piece given a move
+/// Abstracted function to get number of filled tiles in a piece given a move
 /// Useful for algorithms
-pub fn piece_size(mv: &Move) -> usize {
+#[inline]
+pub fn piece_size(mv: &Move) -> u8 {
     match mv.piece {
         0 => 1,
         1..=2 => 2,
@@ -162,6 +163,20 @@ pub fn piece_size(mv: &Move) -> usize {
         9..=27 => 4,
         28..=90 => 5,
         _ => unreachable!(),
+    }
+}
+
+/// Abstracted function to get dimensions of a piece given a move
+#[inline]
+pub fn piece_dims(mv: &Move) -> (u8, u8) {
+    const PC1: usize = PIECE_COUNT + 1;
+    match mv.piece {
+        PC1 => (1, 5),
+        PIECE_COUNT => (5, 1),
+        piece => {
+            let p = &PIECES[piece];
+            (p.width as u8, p.height as u8)
+        }
     }
 }
 

@@ -48,6 +48,7 @@ impl Tournament {
     /// Run a single game with 4 agents
     pub fn simulate_game(&mut self, agents: [usize; Player::N]) {
         // skip the game if all the players are the same, as elo will never change
+        #[cfg(not(debug_assertions))]
         if agents.iter().all_equal() {
             return;
         }
@@ -63,6 +64,8 @@ impl Tournament {
                     game.place_piece(&player, &mv);
                     alive = true;
                 }
+                #[cfg(debug_assertions)]
+                println!("Player {} played:\n{:?}", usize::from(player), game);
             }
         }
 
