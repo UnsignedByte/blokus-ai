@@ -25,6 +25,14 @@ impl<'t> Tournament<'t> {
         }
     }
 
+    /// Get the elo stats for each player
+    pub fn scores(&self) -> Vec<(String, f64)> {
+        self.agents
+            .iter()
+            .map(|agent| (agent.algorithm.name(), agent.elo))
+            .collect()
+    }
+
     /// Simulate one round robin round
     pub fn round_robin(&mut self) {
         for game in repeat(0..self.agents.len())
@@ -46,14 +54,22 @@ impl<'t> Tournament<'t> {
             alive = false;
             for player in Player::iter() {
                 let agent = &mut self.agents[agents[usize::from(player)]];
-                if let Some(mv) = agent.algorithm.decide(&game, &Player::Player1) {
-                    game.place_piece(&Player::Player1, &mv);
+                if let Some(mv) = agent.algorithm.decide(&game, &player) {
+                    game.place_piece(&player, &mv);
                     alive = true;
                 }
             }
         }
 
         let scores = game.scores();
+        // println!(
+        //     "Game {:?} had scores {:?}",
+        //     agents
+        //         .iter()
+        //         .map(|v| self.agents[*v].algorithm.name())
+        //         .collect::<Vec<_>>(),
+        //     scores
+        // );
 
         let mut elo_diffs = [0.; Player::N];
 

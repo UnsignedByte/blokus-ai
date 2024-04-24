@@ -9,7 +9,7 @@
 ## Perf
 
 ```bash
-PERF=1 bash -c 'cargo build --profile=perf$PERF && perf record target/perf$PERF/blokus-ai'
+PERF=1 bash -c 'cargo build --profile=perf$PERF && perf record target/perf$PERF/time'
 perf report
 ```
 

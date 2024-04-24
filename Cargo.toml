@@ -3,6 +3,11 @@ cargo-features = ["profile-rustflags"]
 [package]
 name = "blokus-ai"
 edition = "2021"
+default-run = "blokus-ai"
+
+[[bin]]
+name = "time"
+path = "src/time.rs"
 
 [dependencies]
 bitvec = "1.0.1"
