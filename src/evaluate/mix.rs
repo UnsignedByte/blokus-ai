@@ -32,6 +32,22 @@ where
     }
 }
 
+impl<Alg1, Alg2> Mix<Alg1, Alg2>
+where
+    Alg1: Algorithm + Default,
+    Alg2: Algorithm + Default,
+{
+    pub fn new_ratio(ratio: f64) -> Self {
+        debug_assert!(ratio < 1. && ratio > 0.);
+        Self {
+            alg1: Default::default(),
+            alg2: Default::default(),
+            ratio,
+            rng: rand::thread_rng(),
+        }
+    }
+}
+
 impl<Alg1, Alg2> Algorithm for Mix<Alg1, Alg2>
 where
     Alg1: Algorithm,

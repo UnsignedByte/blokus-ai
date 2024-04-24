@@ -3,12 +3,13 @@ use std::fmt::Write;
 use std::time::Instant;
 
 fn main() {
-    let mut a = Greedy::default();
-    let mut b = Random::default();
-    let mut c = Mix::new(Greedy::default(), Random::default(), 0.25);
-    let mut d = Mix::new(Greedy::default(), Random::default(), 0.5);
-    let mut e = Mix::new(Greedy::default(), Random::default(), 0.75);
-    let mut tournament = Tournament::new(vec![&mut b, &mut c, &mut d, &mut e, &mut a]);
+    let mut tournament = Tournament::new(vec![
+        Box::new(Random::default()),
+        Box::new(Mix::<Greedy, Random>::new_ratio(0.25)),
+        Box::new(Mix::<Greedy, Random>::new_ratio(0.5)),
+        Box::new(Mix::<Greedy, Random>::new_ratio(0.75)),
+        Box::new(Greedy::default()),
+    ]);
 
     loop {
         let now = Instant::now();
