@@ -152,6 +152,19 @@ pub static PIECES: Lazy<[Piece; PIECE_COUNT]> = Lazy::new(|| {
     ]
 });
 
+/// Abstracted function to get size from a piece given a move
+/// Useful for algorithms
+pub fn piece_size(mv: &Move) -> usize {
+    match mv.piece {
+        0 => 1,
+        1..=2 => 2,
+        3..=8 => 3,
+        9..=27 => 4,
+        28..=90 => 5,
+        _ => unreachable!(),
+    }
+}
+
 /// A move.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct Move {

@@ -82,6 +82,19 @@ pub static PIECES: Lazy<[Vec<Piece>; 4]> = Lazy::new(|| {
     ]
 });
 
+/// Abstracted function to get size from a piece given a move
+/// Useful for algorithms
+pub fn piece_size(mv: &Move) -> usize {
+    match usize::from(mv.piece.piece) {
+        0 => 1,
+        1 => 2,
+        2..=3 => 3,
+        4..=9 => 4,
+        10..=21 => 5,
+        _ => unreachable!(),
+    }
+}
+
 /// A move.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Move {
