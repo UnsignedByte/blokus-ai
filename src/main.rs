@@ -8,9 +8,9 @@ fn main() {
         Box::new(Mix::<Greedy, Random>::new_ratio(0.5)),
         Box::new(Greedy::default()),
         Box::new(Distance::ClosestToCenter),
-        Box::new(Distance::FarthestFromCenter),
+        // Box::new(Distance::FarthestFromCenter),
         Box::new(Distance::ClosestToCorner),
-        Box::new(Distance::FarthestFromCorner),
+        // Box::new(Distance::FarthestFromCorner),
     ]);
 
     loop {
