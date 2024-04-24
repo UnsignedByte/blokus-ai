@@ -67,9 +67,9 @@ where
     fn name(&self) -> String {
         format!(
             "{}% {}, {}% {}",
-            f64::floor(self.ratio * 100.),
+            (self.ratio * 100.) as usize,
             self.alg1.name(),
-            f64::ceil(self.ratio * 100.),
+            100 - (self.ratio * 100.) as usize,
             self.alg2.name()
         )
     }
