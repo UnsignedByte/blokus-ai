@@ -130,6 +130,7 @@ impl From<Move> for (PieceTransformID, (i8, i8)) {
 }
 
 /// The game state.
+#[derive(Clone)]
 pub struct State {
     board: Mask,
     /// Corners for every player

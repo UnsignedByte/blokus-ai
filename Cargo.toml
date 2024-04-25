@@ -10,7 +10,6 @@ name = "time"
 path = "src/time.rs"
 
 [dependencies]
-bitvec = "1.0.1"
 itertools = "0.12.1"
 once_cell = "1.19.0"
 ansi_term = "0.12.1"

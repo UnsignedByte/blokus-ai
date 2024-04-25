@@ -216,7 +216,7 @@ fn subsquare_str(mask: &[u16; 400]) -> String {
     f
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Subsquares {
     /// Entry at index x contains a 4x4 mask, corresponding to a move at (x // 20, x % 20).
     occupied_or_color: [u16; 400],
@@ -439,6 +439,7 @@ impl Debug for Subsquares {
 }
 
 /// The game state
+#[derive(Clone)]
 pub struct State {
     subsquares: [Subsquares; Player::N],
     /// Playable pieces for every player
@@ -1063,7 +1064,7 @@ impl State {
                 }
 
                 self.player_pieces[pid] &= !PIECES[mv.piece].id_mask;
-                self.scores[pid] += piece_size(mv) as u8;
+                self.scores[pid] += piece_size(mv);
             }
         }
 

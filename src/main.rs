@@ -1,4 +1,4 @@
-use blokus_ai::evaluate::{Distance, Greedy, Mix, Random, Tournament};
+use blokus_ai::evaluate::{Distance, Greedy, Mix, MoveCount, Random, Tournament};
 use std::fmt::Write;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -12,6 +12,8 @@ fn main() {
         // Box::new(Distance::FarthestFromCenter),
         Box::new(Distance::ClosestToCorner),
         // Box::new(Distance::FarthestFromCorner),
+        Box::new(MoveCount::MaximizeSelf),
+        // Box::new(MoveCount::MinimizeOthers),
     ]);
 
     let mut elo_sum: HashMap<String, f64> = Default::default();
