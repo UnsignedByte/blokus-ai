@@ -1064,7 +1064,7 @@ impl State {
                 }
 
                 self.player_pieces[pid] &= !PIECES[mv.piece].id_mask;
-                self.scores[pid] += piece_size(mv) as u8;
+                self.scores[pid] += piece_size(mv);
             }
         }
 
