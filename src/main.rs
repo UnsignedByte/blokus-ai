@@ -1,5 +1,6 @@
 use blokus_ai::evaluate::{Distance, Greedy, Mix, Random, Tournament};
 use std::fmt::Write;
+use std::collections::HashMap;
 use std::time::Instant;
 
 fn main() {
@@ -13,6 +14,9 @@ fn main() {
         // Box::new(Distance::FarthestFromCorner),
     ]);
 
+    let mut elo_sum: HashMap<String, f64> = Default::default();
+    let mut rr_count = 0;
+
     loop {
         let now = Instant::now();
         tournament.round_robin();
@@ -22,11 +26,27 @@ fn main() {
             .scores()
             .into_iter()
             .fold(String::new(), |mut acc, (name, elo)| {
+                *elo_sum.entry(name.clone()).or_insert(0.0) += elo;
                 writeln!(acc, "{}: {}", name, elo).unwrap();
                 acc
             });
 
+        rr_count += 1;
+
         println!("{}", scores);
+
+        if rr_count % 16 == 0 {
+        let scores = elo_sum
+            .iter()
+            .fold(String::new(), |mut acc, (name, elo)| {
+                writeln!(acc, "{}: {}", name, *elo/ (rr_count as f64)).unwrap();
+                acc
+            });
+
+        rr_count += 1;
+
+        println!("Averages ({} rounds): \n{}", rr_count, scores);
+        }
     }
 }
 

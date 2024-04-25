@@ -2,7 +2,7 @@ use super::Algorithm;
 use crate::game::piece_size;
 use rand::seq::SliceRandom;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Greedy {
     rng: rand::rngs::ThreadRng,
 }

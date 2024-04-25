@@ -1,13 +1,15 @@
 use super::Algorithm;
 use rand::Rng;
+use std::clone::Clone;
 
 /// Algorithm that stochastically chooses between two other algorithms.
 /// `ratio * 100` percent of the time the algorithm will play according
 /// to the roles of alg1, and will play alg2 otherwise.
+#[derive(Clone)]
 pub struct Mix<Alg1, Alg2>
 where
-    Alg1: Algorithm,
-    Alg2: Algorithm,
+    Alg1: Algorithm + Clone,
+    Alg2: Algorithm + Clone,
 {
     rng: rand::rngs::ThreadRng,
     alg1: Alg1,
@@ -18,8 +20,8 @@ where
 
 impl<Alg1, Alg2> Mix<Alg1, Alg2>
 where
-    Alg1: Algorithm,
-    Alg2: Algorithm,
+    Alg1: Algorithm + Clone,
+    Alg2: Algorithm + Clone,
 {
     pub fn new(alg1: Alg1, alg2: Alg2, ratio: f64) -> Self {
         debug_assert!(ratio < 1. && ratio > 0.);
@@ -34,8 +36,8 @@ where
 
 impl<Alg1, Alg2> Mix<Alg1, Alg2>
 where
-    Alg1: Algorithm + Default,
-    Alg2: Algorithm + Default,
+    Alg1: Algorithm + Clone + Default,
+    Alg2: Algorithm + Clone + Default,
 {
     pub fn new_ratio(ratio: f64) -> Self {
         debug_assert!(ratio < 1. && ratio > 0.);
@@ -50,8 +52,8 @@ where
 
 impl<Alg1, Alg2> Algorithm for Mix<Alg1, Alg2>
 where
-    Alg1: Algorithm,
-    Alg2: Algorithm,
+    Alg1: Algorithm + Clone,
+    Alg2: Algorithm + Clone,
 {
     fn decide(
         &mut self,

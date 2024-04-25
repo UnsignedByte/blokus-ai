@@ -1,7 +1,7 @@
 use super::Algorithm;
 use rand::seq::SliceRandom;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Random {
     rng: rand::rngs::ThreadRng,
 }

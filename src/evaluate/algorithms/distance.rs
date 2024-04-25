@@ -3,6 +3,7 @@ use crate::game::{piece_dims, Player};
 use super::Algorithm;
 
 /// Algorithm that sorts moves by distance to a position
+#[derive(Clone)]
 pub enum Distance {
     ClosestToCorner,
     FarthestFromCorner,
