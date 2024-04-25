@@ -1,6 +1,6 @@
-use crate::game::Player;
-
 use super::Algorithm;
+use crate::game::Player;
+use rand::seq::SliceRandom;
 
 /// Algorithms that only look at the number of
 /// possible moves after a given move
@@ -11,13 +11,17 @@ pub enum MoveCount {
     MinimizeOthers,
 }
 
+unsafe impl Sync for MoveCount {}
+
 impl Algorithm for MoveCount {
     fn decide(
-        &mut self,
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
         state: &crate::game::State,
         player: &crate::game::Player,
     ) -> Option<crate::game::Move> {
-        let moves = state.get_moves(player);
+        let mut moves = state.get_moves(player);
+        moves.shuffle(rng);
 
         match self {
             MoveCount::MaximizeSelf => moves.into_iter().max_by_key(|mv| {

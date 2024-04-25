@@ -1,6 +1,6 @@
-use crate::game::{piece_dims, Player};
-
 use super::Algorithm;
+use crate::game::{piece_dims, Player};
+use rand::seq::SliceRandom;
 
 /// Algorithm that sorts moves by distance to a position
 pub enum Distance {
@@ -10,13 +10,18 @@ pub enum Distance {
     FarthestFromCenter,
 }
 
+unsafe impl Sync for Distance {}
+
 impl Algorithm for Distance {
     fn decide(
-        &mut self,
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
         state: &crate::game::State,
         player: &crate::game::Player,
     ) -> Option<crate::game::Move> {
-        state.get_moves(player).into_iter().min_by_key(|mv| {
+        let mut moves = state.get_moves(player);
+        moves.shuffle(rng);
+        moves.into_iter().min_by_key(|mv| {
             // Here, we get all 4 corners of the bounding box around the piece
             let (w, h) = piece_dims(mv);
             let (w, h) = (w as i8, h as i8);

@@ -3,19 +3,19 @@ use crate::game::piece_size;
 use rand::seq::SliceRandom;
 
 #[derive(Default)]
-pub struct Greedy {
-    rng: rand::rngs::ThreadRng,
-}
+pub struct Greedy;
+unsafe impl Sync for Greedy {}
 
 impl Algorithm for Greedy {
     fn decide(
-        &mut self,
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
         state: &crate::game::State,
         player: &crate::game::Player,
     ) -> Option<crate::game::Move> {
         // we shuffle here so that the max-size move is random
         let mut moves = state.get_moves(player);
-        moves.shuffle(&mut self.rng);
+        moves.shuffle(rng);
         moves.into_iter().max_by_key(piece_size)
     }
 

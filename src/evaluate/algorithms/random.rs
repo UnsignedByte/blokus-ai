@@ -2,17 +2,18 @@ use super::Algorithm;
 use rand::seq::SliceRandom;
 
 #[derive(Default)]
-pub struct Random {
-    rng: rand::rngs::ThreadRng,
-}
+pub struct Random;
+
+unsafe impl Sync for Random {}
 
 impl Algorithm for Random {
     fn decide(
-        &mut self,
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
         state: &crate::game::State,
         player: &crate::game::Player,
     ) -> Option<crate::game::Move> {
-        state.get_moves(player).choose(&mut self.rng).cloned()
+        state.get_moves(player).choose(rng).cloned()
     }
 
     fn name(&self) -> String {

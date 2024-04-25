@@ -9,11 +9,17 @@ where
     Alg1: Algorithm,
     Alg2: Algorithm,
 {
-    rng: rand::rngs::ThreadRng,
     alg1: Alg1,
     alg2: Alg2,
     /// Probability ratio between choosing alg1 and alg2
     ratio: f64,
+}
+
+unsafe impl<Alg1, Alg2> Sync for Mix<Alg1, Alg2>
+where
+    Alg1: Algorithm + Sync,
+    Alg2: Algorithm + Sync,
+{
 }
 
 impl<Alg1, Alg2> Mix<Alg1, Alg2>
@@ -23,12 +29,7 @@ where
 {
     pub fn new(alg1: Alg1, alg2: Alg2, ratio: f64) -> Self {
         debug_assert!(ratio < 1. && ratio > 0.);
-        Self {
-            alg1,
-            alg2,
-            ratio,
-            rng: rand::thread_rng(),
-        }
+        Self { alg1, alg2, ratio }
     }
 }
 
@@ -43,7 +44,6 @@ where
             alg1: Default::default(),
             alg2: Default::default(),
             ratio,
-            rng: rand::thread_rng(),
         }
     }
 }
@@ -54,13 +54,14 @@ where
     Alg2: Algorithm,
 {
     fn decide(
-        &mut self,
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
         state: &crate::game::State,
         player: &crate::game::Player,
     ) -> Option<crate::game::Move> {
-        match self.rng.gen_bool(self.ratio) {
-            true => self.alg1.decide(state, player),
-            false => self.alg2.decide(state, player),
+        match rng.gen_bool(self.ratio) {
+            true => self.alg1.decide(rng, state, player),
+            false => self.alg2.decide(rng, state, player),
         }
     }
 
