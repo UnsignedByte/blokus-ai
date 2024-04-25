@@ -4,14 +4,15 @@ use std::time::Instant;
 
 fn main() {
     let mut tournament = Tournament::new(vec![
-        Box::new(Random::default()),
+        Box::new(Random),
         Box::new(Mix::<Greedy, Random>::new_ratio(0.5)),
-        Box::new(Greedy::default()),
+        Box::new(Greedy),
         Box::new(Distance::ClosestToCenter),
         // Box::new(Distance::FarthestFromCenter),
         Box::new(Distance::ClosestToCorner),
         // Box::new(Distance::FarthestFromCorner),
         Box::new(MoveCount::MaximizeSelf),
+        Box::new(Mix::new(MoveCount::MaximizeSelf, Greedy, 0.5)),
         // Box::new(MoveCount::MinimizeOthers),
     ]);
 
@@ -20,15 +21,7 @@ fn main() {
         tournament.round_robin();
         println!("Round robin took {} ms", now.elapsed().as_millis());
 
-        let scores = tournament
-            .scores()
-            .into_iter()
-            .fold(String::new(), |mut acc, (name, elo)| {
-                writeln!(acc, "{}: {}", name, elo).unwrap();
-                acc
-            });
-
-        println!("{}", scores);
+        println!("{}", tournament);
     }
 }
 

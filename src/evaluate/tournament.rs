@@ -2,12 +2,46 @@ use super::Algorithm;
 use crate::game::{Player, State};
 use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::iter::repeat;
+use std::{fmt::Display, iter::repeat};
 
 /// Player in a tournament
+/// Contains statistics about the player
 struct Agent {
     algorithm: Box<dyn Algorithm + Sync>,
     elo: f64,
+    games_played: usize,
+    cumulative_points: usize,
+}
+
+impl Agent {
+    pub fn new(algorithm: Box<dyn Algorithm + Sync>) -> Self {
+        Self {
+            algorithm,
+            elo: 0.,
+            games_played: 0,
+            cumulative_points: 0,
+        }
+    }
+}
+
+impl Display for Agent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}:", self.algorithm.name(),)?;
+        writeln!(
+            f,
+            "{: ^20}{: ^20}{: ^20}{: ^20}",
+            "ELO", "Avg Pts", "Games Played", "Total Pts"
+        )?;
+        writeln!(
+            f,
+            "{: ^20.4}{: ^20.4}{: ^20.4}{: ^20.4}",
+            self.elo,
+            (self.cumulative_points as f32) / (self.games_played as f32),
+            self.games_played,
+            self.cumulative_points
+        )?;
+        Ok(())
+    }
 }
 
 /// Hosts a tournament with elo ratings
@@ -19,19 +53,8 @@ pub struct Tournament {
 impl Tournament {
     pub fn new(algorithms: Vec<Box<dyn Algorithm + Sync>>) -> Self {
         Self {
-            agents: algorithms
-                .into_iter()
-                .map(|algorithm| Agent { algorithm, elo: 0. })
-                .collect(),
+            agents: algorithms.into_iter().map(Agent::new).collect(),
         }
-    }
-
-    /// Get the elo stats for each player
-    pub fn scores(&self) -> Vec<(String, f64)> {
-        self.agents
-            .iter()
-            .map(|agent| (agent.algorithm.name(), agent.elo))
-            .collect()
     }
 
     /// Simulate one round robin round
@@ -44,7 +67,7 @@ impl Tournament {
 
         let scores: Vec<_> = games
             .into_par_iter()
-            .map(|agents| (agents, self.simulate_game(agents)))
+            .filter_map(|agents| self.simulate_game(agents).map(|scores| (agents, scores)))
             .collect();
 
         for (agents, score) in scores {
@@ -53,11 +76,11 @@ impl Tournament {
     }
 
     /// Run a single game with 4 agents
-    pub fn simulate_game(&self, agents: [usize; Player::N]) -> [u8; Player::N] {
+    pub fn simulate_game(&self, agents: [usize; Player::N]) -> Option<[u8; Player::N]> {
         // skip the game if all the players are the same, as elo will never change
         #[cfg(not(debug_assertions))]
         if agents.iter().all_equal() {
-            return [0, 0, 0, 0];
+            return None;
         }
 
         // create a new rng
@@ -79,7 +102,7 @@ impl Tournament {
             }
         }
 
-        *game.scores()
+        Some(*game.scores())
         // println!(
         //     "Game {:?} had scores {:?}",
         //     agents
@@ -121,7 +144,40 @@ impl Tournament {
 
         // update all elos
         for player in 0..Player::N {
-            self.agents[agents[player]].elo += elo_diffs[player];
+            let agent = &mut self.agents[agents[player]];
+            agent.elo += elo_diffs[player];
+            agent.cumulative_points += scores[player] as usize;
+            agent.games_played += 1;
         }
+    }
+}
+
+impl Display for Tournament {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // maximum width of names
+        let w = self
+            .agents
+            .iter()
+            .map(|agent| agent.algorithm.name().len())
+            .max()
+            .unwrap()
+            + 2;
+        writeln!(
+            f,
+            "{: <w$}{: <15}{: <15}{: <15}{: <15}",
+            "Algorithm", "ELO", "Avg Pts", "Games Played", "Total Pts",
+        )?;
+        for agent in &self.agents {
+            writeln!(
+                f,
+                "{: <w$}{: <15.4}{: <15.4}{: <15.4}{: <15.4}",
+                agent.algorithm.name(),
+                agent.elo,
+                (agent.cumulative_points as f32) / (agent.games_played as f32),
+                agent.games_played,
+                agent.cumulative_points
+            )?;
+        }
+        Ok(())
     }
 }
