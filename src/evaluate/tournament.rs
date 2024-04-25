@@ -2,7 +2,12 @@ use super::Algorithm;
 use crate::game::{Player, State};
 use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::{fmt::Display, iter::repeat};
+use std::{
+    array,
+    fmt::Display,
+    iter::repeat,
+    time::{Duration, Instant},
+};
 
 /// Player in a tournament
 /// Contains statistics about the player
@@ -11,6 +16,7 @@ struct Agent {
     elo: f64,
     games_played: usize,
     cumulative_points: usize,
+    elapsed: Duration,
 }
 
 impl Agent {
@@ -20,6 +26,7 @@ impl Agent {
             elo: 0.,
             games_played: 0,
             cumulative_points: 0,
+            elapsed: Duration::default(),
         }
     }
 }
@@ -44,15 +51,25 @@ impl Display for Agent {
     }
 }
 
+/// Struct representing a single player's performance in a game
+/// Contains scores as well as extra info
+pub struct GameStats {
+    score: u8,
+    elapsed: Duration,
+}
+
 /// Hosts a tournament with elo ratings
 pub struct Tournament {
     /// AI Agents that will be playing in this tournament
     agents: Vec<Agent>,
+    /// Elo floor
+    elo_floor: f64,
 }
 
 impl Tournament {
-    pub fn new(algorithms: Vec<Box<dyn Algorithm + Sync>>) -> Self {
+    pub fn new(elo_floor: f64, algorithms: Vec<Box<dyn Algorithm + Sync>>) -> Self {
         Self {
+            elo_floor,
             agents: algorithms.into_iter().map(Agent::new).collect(),
         }
     }
@@ -76,7 +93,7 @@ impl Tournament {
     }
 
     /// Run a single game with 4 agents
-    pub fn simulate_game(&self, agents: [usize; Player::N]) -> Option<[u8; Player::N]> {
+    pub fn simulate_game(&self, agents: [usize; Player::N]) -> Option<[GameStats; Player::N]> {
         // skip the game if all the players are the same, as elo will never change
         #[cfg(not(debug_assertions))]
         if agents.iter().all_equal() {
@@ -88,21 +105,31 @@ impl Tournament {
 
         let mut game = State::new(20, 20);
         let mut alive = true;
+        let mut times = [Duration::default(); Player::N];
         // run as long as a player is still playing
         while alive {
             alive = false;
             for player in Player::iter() {
-                let agent = &self.agents[agents[usize::from(player)]];
+                let pid = usize::from(player);
+
+                let agent = &self.agents[agents[pid]];
+                let now = Instant::now();
                 if let Some(mv) = agent.algorithm.decide(&mut rng, &game, &player) {
                     game.place_piece(&player, &mv);
                     alive = true;
                 }
+                times[pid] += now.elapsed();
                 #[cfg(debug_assertions)]
-                println!("Player {} played:\n{:?}", usize::from(player), game);
+                println!("Player {} played:\n{:?}", pid, game);
             }
         }
 
-        Some(*game.scores())
+        let scores = game.scores();
+
+        Some(array::from_fn(|pid| GameStats {
+            score: scores[pid],
+            elapsed: times[pid],
+        }))
         // println!(
         //     "Game {:?} had scores {:?}",
         //     agents
@@ -113,7 +140,7 @@ impl Tournament {
         // );
     }
 
-    pub fn update_elo(&mut self, agents: [usize; Player::N], scores: [u8; Player::N]) {
+    pub fn update_elo(&mut self, agents: [usize; Player::N], stats: [GameStats; Player::N]) {
         let mut elo_diffs = [0.; Player::N];
 
         // calculate pairwise ELO
@@ -129,7 +156,7 @@ impl Tournament {
                 }
                 let o_agent = &self.agents[agents[o_player]];
 
-                let s = match scores[player].cmp(&scores[o_player]) {
+                let s = match stats[player].score.cmp(&stats[o_player].score) {
                     std::cmp::Ordering::Less => 0., // lost
                     std::cmp::Ordering::Equal => 0.5,
                     std::cmp::Ordering::Greater => 1.0, // we won
@@ -146,8 +173,14 @@ impl Tournament {
         for player in 0..Player::N {
             let agent = &mut self.agents[agents[player]];
             agent.elo += elo_diffs[player];
-            agent.cumulative_points += scores[player] as usize;
+
+            // ELO floor of 100
+            if agent.elo < self.elo_floor {
+                agent.elo = self.elo_floor;
+            }
+            agent.cumulative_points += stats[player].score as usize;
             agent.games_played += 1;
+            agent.elapsed += stats[player].elapsed;
         }
     }
 }
@@ -165,7 +198,7 @@ impl Display for Tournament {
         writeln!(
             f,
             "{: <w$}{: <15}{: <15}{: <15}{: <15}",
-            "Algorithm", "ELO", "Avg Pts", "Games Played", "Total Pts",
+            "Algorithm", "ELO", "Avg Pts", "Avg ms / Game", "Games Played",
         )?;
         for agent in &self.agents {
             writeln!(
@@ -174,8 +207,8 @@ impl Display for Tournament {
                 agent.algorithm.name(),
                 agent.elo,
                 (agent.cumulative_points as f32) / (agent.games_played as f32),
+                (agent.elapsed.as_millis() as f32) / (agent.games_played as f32),
                 agent.games_played,
-                agent.cumulative_points
             )?;
         }
         Ok(())

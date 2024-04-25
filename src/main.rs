@@ -3,18 +3,21 @@ use std::fmt::Write;
 use std::time::Instant;
 
 fn main() {
-    let mut tournament = Tournament::new(vec![
-        Box::new(Random),
-        Box::new(Mix::<Greedy, Random>::new_ratio(0.5)),
-        Box::new(Greedy),
-        Box::new(Distance::ClosestToCenter),
-        // Box::new(Distance::FarthestFromCenter),
-        Box::new(Distance::ClosestToCorner),
-        // Box::new(Distance::FarthestFromCorner),
-        Box::new(MoveCount::MaximizeSelf),
-        Box::new(Mix::new(MoveCount::MaximizeSelf, Greedy, 0.5)),
-        // Box::new(MoveCount::MinimizeOthers),
-    ]);
+    let mut tournament = Tournament::new(
+        100.,
+        vec![
+            Box::new(Random),
+            Box::new(Mix::<Greedy, Random>::new_ratio(0.5)),
+            Box::new(Greedy),
+            Box::new(Distance::ClosestToCenter),
+            // Box::new(Distance::FarthestFromCenter),
+            Box::new(Distance::ClosestToCorner),
+            // Box::new(Distance::FarthestFromCorner),
+            Box::new(MoveCount::MaximizeSelf),
+            Box::new(Mix::new(MoveCount::MaximizeSelf, Greedy, 0.5)),
+            // Box::new(MoveCount::MinimizeOthers),
+        ],
+    );
 
     loop {
         let now = Instant::now();
