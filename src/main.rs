@@ -1,4 +1,4 @@
-use blokus_ai::evaluate::{Distance, Greedy, Mix, Random, Tournament};
+use blokus_ai::evaluate::{Distance, Greedy, Mix, MoveCount, Random, Tournament};
 use std::fmt::Write;
 use std::time::Instant;
 
@@ -11,6 +11,8 @@ fn main() {
         // Box::new(Distance::FarthestFromCenter),
         Box::new(Distance::ClosestToCorner),
         // Box::new(Distance::FarthestFromCorner),
+        Box::new(MoveCount::MaximizeSelf),
+        // Box::new(MoveCount::MinimizeOthers),
     ]);
 
     loop {

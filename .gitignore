@@ -180,3 +180,5 @@ Cargo.lock
 *.perf
 perf.data
 perf.data.old
+
+flamegraph.svg
