@@ -183,13 +183,14 @@ pub fn piece_dims(mv: &Move) -> (u8, u8) {
 /// A move.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct Move {
+    pub player: Player,
     pub piece: usize,
     pub pos: (i8, i8),
 }
 
 impl Move {
-    pub fn new(piece: usize, pos: (i8, i8)) -> Self {
-        Self { piece, pos }
+    pub fn new(player: Player, piece: usize, pos: (i8, i8)) -> Self {
+        Self { player, piece, pos }
     }
 }
 
@@ -224,7 +225,7 @@ pub struct Subsquares {
 }
 
 impl Subsquares {
-    pub fn test_piece(&self, moves: &mut Vec<Move>, piece_id: usize, piece: u16) {
+    pub fn test_piece(&self, moves: &mut Vec<Move>, player: &Player, piece_id: usize, piece: u16) {
         unsafe {
             let piece = _mm256_set1_epi16(piece as i16);
             let zero = _mm256_setzero_si256();
@@ -256,6 +257,7 @@ impl Subsquares {
                     ok >>= 2;
 
                     moves.push(Move::new(
+                        *player,
                         piece_id,
                         ((move_index % 20) as i8, (move_index / 20) as i8),
                     ));
@@ -502,6 +504,7 @@ impl State {
             let old_len = moves.len();
             self.subsquares[usize::from(player)].test_piece(
                 &mut moves,
+                player,
                 piece,
                 pieces[piece].as_u16,
             );
@@ -519,6 +522,7 @@ impl State {
 
                 for mv_i in old_len..moves.len() {
                     let Move {
+                        player: _,
                         piece: _,
                         pos: (x, y),
                     } = &moves[mv_i];
@@ -542,7 +546,7 @@ impl State {
                                 .unwrap_or(true)
                     // treat out of bounds as full
                     {
-                        moves.push(Move::new(PIECE_COUNT, (x as i8, y as i8)))
+                        moves.push(Move::new(*player, PIECE_COUNT, (x as i8, y as i8)))
                     } else if
                     // (x+3, y) is a corner
                     ss.get_unchecked(SubsquareMaskTyp::Validcorners, x+3, y).unwrap() // never out of bounds 
@@ -551,7 +555,7 @@ impl State {
                             .unwrap_or(true)
                     // treat out of bounds as full
                     {
-                        moves.push(Move::new(PIECE_COUNT, (x as i8 - 1, y as i8)))
+                        moves.push(Move::new(*player, PIECE_COUNT, (x as i8 - 1, y as i8)))
                     }
                 }
             } else if pieces[piece].width == 1
@@ -564,6 +568,7 @@ impl State {
 
                 for mv_i in old_len..moves.len() {
                     let Move {
+                        player: _,
                         piece: _,
                         pos: (x, y),
                     } = &moves[mv_i];
@@ -575,13 +580,13 @@ impl State {
                                 .unwrap_or(true)
                     // treat out of bounds as full
                     {
-                        moves.push(Move::new(PIECE_COUNT + 1, (x as i8, y as i8)))
+                        moves.push(Move::new(*player, PIECE_COUNT + 1, (x as i8, y as i8)))
                     } else if ss.get_unchecked(SubsquareMaskTyp::Validcorners, x, y + 3).unwrap() // never out of bounds 
                     && y > 0 && !ss.get_unchecked(SubsquareMaskTyp::OccupiedOrColor, x, y - 1)
                             .unwrap_or(true)
                     // treat out of bounds as full
                     {
-                        moves.push(Move::new(PIECE_COUNT + 1, (x as i8, y as i8 - 1)))
+                        moves.push(Move::new(*player, PIECE_COUNT + 1, (x as i8, y as i8 - 1)))
                     }
                 }
             }
@@ -863,9 +868,9 @@ impl State {
         self.scores[pid] += 5;
     }
 
-    pub fn place_piece(&mut self, player: &Player, mv: &Move) {
+    pub fn place_piece(&mut self, mv: &Move) {
         let (x, y) = mv.pos;
-        let pid = usize::from(player);
+        let pid = usize::from(mv.player);
 
         const PC1: usize = PIECE_COUNT + 1;
         match mv.piece {
@@ -1130,7 +1135,7 @@ mod test {
         // Place it in the top right at (0, 0)
         let mut game = State::new(20, 20);
         game.check();
-        game.place_piece(&Player::Player1, &Move::new(piece, (0, 0)));
+        game.place_piece(&Move::new(Player::Player1, piece, (0, 0)));
         // Make sure all the masks are valid
         game.check();
 
@@ -1179,7 +1184,7 @@ mod test {
         // Place it in the top right at (1, 1)
         let mut game = State::new(20, 20);
         game.check();
-        game.place_piece(&Player::Player1, &Move::new(piece, (1, 1)));
+        game.place_piece(&Move::new(Player::Player1, piece, (1, 1)));
         // Make sure all the masks are valid
         game.check();
 
@@ -1227,7 +1232,7 @@ mod test {
         // Place it in the bottom left at (19, 19)
         let mut game = State::new(20, 20);
         game.check();
-        game.place_piece(&Player::Player1, &Move::new(piece, (19, 19)));
+        game.place_piece(&Move::new(Player::Player1, piece, (19, 19)));
         // Make sure all the masks are valid
         game.check();
 
@@ -1291,7 +1296,7 @@ mod test {
         // Place it in the top right at (0, 0)
         let mut game = State::new(20, 20);
         game.check();
-        game.place_piece(&Player::Player1, &Move::new(piece, (0, 0)));
+        game.place_piece(&Move::new(Player::Player1, piece, (0, 0)));
         // Make sure all the masks are valid
         game.check();
         // The masks at the top right should look like
@@ -1345,7 +1350,7 @@ mod test {
 
         let mut game = State::new(20, 20);
         game.check();
-        game.place_piece(&Player::Player1, &Move::new(piece, (0, 16)));
+        game.place_piece(&Move::new(Player::Player1, piece, (0, 16)));
         // Make sure all the masks are valid
         game.check();
         // The masks at the bottom right should look like
@@ -1408,7 +1413,7 @@ mod test {
 
         let mut game = State::new(20, 20);
         game.check();
-        game.place_piece(&Player::Player1, &Move::new(piece, (1, 1)));
+        game.place_piece(&Move::new(Player::Player1, piece, (1, 1)));
         // Make sure all the masks are valid
         game.check();
 
@@ -1433,7 +1438,7 @@ mod test {
 
         let mut game = State::new(20, 20);
         game.check();
-        game.place_piece(&Player::Player1, &Move::new(piece, (1, 1)));
+        game.place_piece(&Move::new(Player::Player1, piece, (1, 1)));
         // Make sure all the masks are valid
         game.check();
 
@@ -1458,7 +1463,7 @@ mod test {
 
         let mut game = State::new(20, 20);
         game.check();
-        game.place_piece(&Player::Player1, &Move::new(piece, (17, 9)));
+        game.place_piece(&Move::new(Player::Player1, piece, (17, 9)));
         // Make sure all the masks are valid
         game.check();
 

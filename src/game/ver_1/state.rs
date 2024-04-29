@@ -107,19 +107,14 @@ pub fn piece_dims(mv: &Move) -> (u8, u8) {
 /// A move.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Move {
+    pub player: Player,
     pub piece: PieceTransformID,
     pub pos: (i8, i8),
 }
 
 impl Move {
-    pub fn new(piece: PieceTransformID, pos: (i8, i8)) -> Self {
-        Self { piece, pos }
-    }
-}
-
-impl From<(PieceTransformID, (i8, i8))> for Move {
-    fn from((piece, pos): (PieceTransformID, (i8, i8))) -> Self {
-        Self { piece, pos }
+    pub fn new(player: Player, piece: PieceTransformID, pos: (i8, i8)) -> Self {
+        Self { player, piece, pos }
     }
 }
 
@@ -215,7 +210,7 @@ impl State {
                         self.board
                             .no_overlap(&piece_transform.neighbor_mask, (*cx - 1, *cy - 1))
                     })
-                    .map(move |(cx, cy)| Move::new(tid, (cx, cy)))
+                    .map(move |(cx, cy)| Move::new(Player::from(player), tid, (cx, cy)))
             })
     }
 
@@ -244,8 +239,8 @@ impl State {
     }
 
     /// Place a piece on the board
-    pub fn place_piece(&mut self, player: &Player, mv: &Move) {
-        let Move { piece, pos } = *mv;
+    pub fn place_piece(&mut self, mv: &Move) {
+        let Move { player, piece, pos } = *mv;
 
         let transformed_piece =
             &PIECES[usize::from(player)][usize::from(piece.piece)].versions[piece.version];
@@ -263,7 +258,7 @@ impl State {
         self.board = self.board.or(&transformed_piece.mask, (x, y));
         // Remove the piece from the player's pieces
         self.player_pieces[usize::from(player)][usize::from(piece.piece)] = false;
-        self.scores[usize::from(player)] += piece_size(mv) as u8;
+        self.scores[usize::from(player)] += piece_size(mv);
 
         // Update the corners
         for (x, y, v) in transformed_piece.tile_iter() {

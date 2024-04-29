@@ -182,7 +182,7 @@ impl Add<(i8, i8)> for Neighbor {
 }
 
 /// Enum for every player.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub enum Player {
     Player1,
     Player2,
@@ -202,6 +202,15 @@ impl Player {
             Player::Player4,
         ]
         .into_iter()
+    }
+
+    pub fn next(&self) -> Player {
+        match self {
+            Player::Player1 => Player::Player2,
+            Player::Player2 => Player::Player3,
+            Player::Player3 => Player::Player4,
+            Player::Player4 => Player::Player1,
+        }
     }
 
     #[inline]

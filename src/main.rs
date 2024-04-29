@@ -1,4 +1,6 @@
-use blokus_ai::evaluate::{Distance, Greedy, Mix, MoveCount, Random, Tournament};
+use blokus_ai::evaluate::{
+    Distance, GreedyMax, MiniMax, Mix, MoveCount, Random, Score, Tournament,
+};
 use std::time::Instant;
 
 fn main() {
@@ -6,16 +8,18 @@ fn main() {
         100.,
         vec![
             Box::new(Random),
-            Box::new(Mix::<Greedy, Random>::new_ratio(0.5)),
-            Box::new(Greedy),
-            Box::new(Distance::TowardCenter),
+            // Box::new(Mix::<GreedyMax<Score>, Random>::new_ratio(0.5)),
+            // Box::new(Distance::TowardCenter),
             // Box::new(Distance::FarthestFromCenter),
-            Box::new(Distance::TowardCorner),
+            // Box::new(Distance::TowardCorner),
             // Box::new(Distance::FarthestFromCorner),
-            Box::new(Distance::TowardBestOpponent),
-            Box::new(MoveCount::MaximizeSelf),
-            Box::new(Mix::new(MoveCount::MaximizeSelf, Greedy, 0.5)),
-            // Box::new(MoveCount::MinimizeOthers),
+            // Box::new(Distance::TowardBestOpponent),
+            Box::new(GreedyMax::<Score>::default()),
+            // Box::new(GreedyMax::<MoveCount>::default()),
+            // Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
+            //     0.5,
+            // )),
+            Box::new(MiniMax::<3, Score>::default()),
         ],
     );
 

@@ -1,13 +1,15 @@
+mod algorithm;
 mod distance;
 mod greedy;
+mod heuristics;
+mod minimax;
 mod mix;
-mod move_count;
 mod random;
-mod traits;
 
+pub use algorithm::Algorithm;
 pub use distance::Distance;
-pub use greedy::Greedy;
+pub use greedy::{GreedyMax, GreedyMin};
+pub use heuristics::*;
+pub use minimax::MiniMax;
 pub use mix::Mix;
-pub use move_count::MoveCount;
 pub use random::Random;
-pub use traits::{Algorithm, Heuristic};

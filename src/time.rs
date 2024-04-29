@@ -51,7 +51,7 @@ fn main() {
                 let move_ = moves.choose(&mut rng).unwrap();
 
                 let now = Instant::now();
-                game.place_piece(&player, move_);
+                game.place_piece(move_);
                 let place_elapsed = now.elapsed();
                 if debug {
                     println!("{:?}", game);

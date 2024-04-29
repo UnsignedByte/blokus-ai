@@ -1,5 +1,6 @@
-use super::Heuristic;
+use super::Algorithm;
 use crate::game::{piece_dims, Player, State};
+use rand::seq::SliceRandom;
 
 /// Algorithm that sorts moves by distance to a position
 pub enum Distance {
@@ -10,16 +11,14 @@ pub enum Distance {
     TowardBestOpponent,
 }
 
-unsafe impl Sync for Distance {}
-
-impl Heuristic for Distance {
-    type Key = i16;
-
-    fn key(&self, state: &State, player: &Player, mv: &crate::game::Move) -> Self::Key {
+impl Distance {
+    fn distance(&self, state: &State, mv: &crate::game::Move) -> i16 {
         // Here, we get all 4 corners of the bounding box around the piece
         let (w, h) = piece_dims(mv);
         let (w, h) = (w as i8, h as i8);
         let (x, y) = mv.pos;
+
+        let player = &mv.player;
 
         // Four corners.
         let corners = [(x, y), (x, y + h), (x + w, y), (x + w, y + h)];
@@ -71,7 +70,11 @@ impl Heuristic for Distance {
             .max()
             .unwrap()
     }
+}
 
+unsafe impl Sync for Distance {}
+
+impl Algorithm for Distance {
     fn name(&self) -> String {
         match self {
             Distance::TowardBestOpponent => "Toward Best Enemy",
@@ -81,5 +84,17 @@ impl Heuristic for Distance {
             Distance::AwayFromCenter => "Away from Center",
         }
         .to_owned()
+    }
+
+    fn decide(
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
+        state: &State,
+        player: &Player,
+    ) -> Option<crate::game::Move> {
+        // we shuffle here so that ties are resolved randomly
+        let mut moves = state.get_moves(player);
+        moves.shuffle(rng);
+        moves.into_iter().max_by_key(|mv| self.distance(state, mv))
     }
 }

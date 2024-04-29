@@ -115,7 +115,7 @@ impl Tournament {
                 let agent = &self.agents[agents[pid]];
                 let now = Instant::now();
                 if let Some(mv) = agent.algorithm.decide(&mut rng, &game, &player) {
-                    game.place_piece(&player, &mv);
+                    game.place_piece(&mv);
                     alive = true;
                 }
                 times[pid] += now.elapsed();
