@@ -4,6 +4,7 @@ mod greedy;
 mod heuristics;
 mod minimax;
 mod mix;
+mod montecarlo;
 mod random;
 
 pub use algorithm::Algorithm;
@@ -12,4 +13,5 @@ pub use greedy::{GreedyMax, GreedyMin};
 pub use heuristics::*;
 pub use minimax::MiniMax;
 pub use mix::Mix;
+pub use montecarlo::MonteCarlo;
 pub use random::Random;

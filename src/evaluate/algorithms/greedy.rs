@@ -33,7 +33,7 @@ where
         moves.shuffle(rng);
         moves
             .into_iter()
-            .max_by_key(|mv| self.heuristic.evaluate_move(state, player, mv))
+            .max_by_key(|mv| self.heuristic.evaluate_move(rng, state, player, mv))
     }
 
     fn name(&self) -> String {
@@ -72,7 +72,7 @@ where
         moves.shuffle(rng);
         moves
             .into_iter()
-            .min_by_key(|mv| self.heuristic.evaluate_move(state, player, mv))
+            .min_by_key(|mv| self.heuristic.evaluate_move(rng, state, player, mv))
     }
 
     fn name(&self) -> String {

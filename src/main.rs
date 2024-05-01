@@ -1,5 +1,5 @@
 use blokus_ai::evaluate::{
-    Distance, GreedyMax, MiniMax, Mix, MoveCount, Random, Score, Tournament,
+    Distance, GreedyMax, MiniMax, Mix, MonteCarlo, MoveCount, Random, Score, Tournament,
 };
 use std::time::Instant;
 
@@ -15,11 +15,12 @@ fn main() {
             // Box::new(Distance::FarthestFromCorner),
             // Box::new(Distance::TowardBestOpponent),
             Box::new(GreedyMax::<Score>::default()),
-            // Box::new(GreedyMax::<MoveCount>::default()),
+            Box::new(GreedyMax::<MoveCount>::default()),
+            // Box::new(MonteCarlo::new(1000, f64::sqrt(2.))),
             // Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
             //     0.5,
             // )),
-            Box::new(MiniMax::<3, Score>::default()),
+            // Box::new(MiniMax::<2, MoveCount>::default()),
         ],
     );
 

@@ -15,7 +15,12 @@ impl Heuristic for MoveCount {
 
     type Key = usize;
 
-    fn evaluate(&self, state: &crate::game::State, player: &Player) -> Self::Key {
+    fn evaluate(
+        &self,
+        _: &mut rand::rngs::ThreadRng,
+        state: &crate::game::State,
+        player: &Player,
+    ) -> Self::Key {
         state.get_moves(player).len()
     }
 }

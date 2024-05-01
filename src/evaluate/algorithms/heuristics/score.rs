@@ -8,12 +8,18 @@ unsafe impl Sync for Score {}
 impl Heuristic for Score {
     type Key = u8;
 
-    fn evaluate(&self, state: &crate::game::State, player: &crate::game::Player) -> Self::Key {
+    fn evaluate(
+        &self,
+        _: &mut rand::rngs::ThreadRng,
+        state: &crate::game::State,
+        player: &crate::game::Player,
+    ) -> Self::Key {
         state.scores()[usize::from(player)]
     }
 
     fn evaluate_move(
         &self,
+        _: &mut rand::rngs::ThreadRng,
         state: &crate::game::State,
         player: &crate::game::Player,
         mv: &crate::game::Move,

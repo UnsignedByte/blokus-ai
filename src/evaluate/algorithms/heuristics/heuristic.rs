@@ -7,16 +7,27 @@ pub trait Heuristic {
     type Key: Ord;
 
     /// Evaluate a state using this heuristic for a given player
-    fn evaluate(&self, state: &State, player: &Player) -> Self::Key;
+    fn evaluate(
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
+        state: &State,
+        player: &Player,
+    ) -> Self::Key;
 
     /// Evaluate how the heuristic would change after a move
     /// Sometimes this should be implemented as it can be faster than
     /// placing the piece and then evaluating
-    fn evaluate_move(&self, state: &State, player: &Player, mv: &Move) -> Self::Key {
+    fn evaluate_move(
+        &self,
+        rng: &mut rand::rngs::ThreadRng,
+        state: &State,
+        player: &Player,
+        mv: &Move,
+    ) -> Self::Key {
         // By default, just place the piece and then evaluate
         let mut state = state.clone();
         state.place_piece(mv);
-        self.evaluate(&state, player)
+        self.evaluate(rng, &state, player)
     }
 
     /// String name for the heuristic

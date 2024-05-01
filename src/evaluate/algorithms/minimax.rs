@@ -27,6 +27,7 @@ where
 }
 
 fn minimax<H: Heuristic>(
+    rng: &mut rand::rngs::ThreadRng,
     depth: usize,
     // Player being evaluated
     evaluating_player: &Player,
@@ -43,7 +44,7 @@ fn minimax<H: Heuristic>(
             // we use evaluate_move as it may be faster
             let moves = moves
                 .into_iter()
-                .map(|mv| heuristic.evaluate_move(state, evaluating_player, &mv));
+                .map(|mv| heuristic.evaluate_move(rng, state, evaluating_player, &mv));
             match player == evaluating_player {
                 true => moves.max(),
                 false => moves.min(),
@@ -58,6 +59,7 @@ fn minimax<H: Heuristic>(
                     nstate.place_piece(&mv);
 
                     minimax(
+                        rng, 
                         depth - 1,
                         evaluating_player,
                         &player.next(),
@@ -91,9 +93,17 @@ impl<const DEPTH: usize, H: Heuristic> Algorithm for MiniMax<DEPTH, H> {
         moves.into_iter().max_by_key(|mv| {
             let mut nstate = state.clone();
             nstate.place_piece(mv);
-            minimax(DEPTH - 1, player, &player.next(), &nstate, &self.heuristic).unwrap_or(
+            minimax(
+                rng,
+                DEPTH - 1,
+                player,
+                &player.next(),
+                &nstate,
+                &self.heuristic,
+            )
+            .unwrap_or(
                 // If there are no moves, then the game is over so the score is just the current score
-                self.heuristic.evaluate(&nstate, player),
+                self.heuristic.evaluate(rng, &nstate, player),
             )
         })
     }
