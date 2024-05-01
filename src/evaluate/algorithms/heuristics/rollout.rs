@@ -8,12 +8,23 @@ pub struct Rollout {
     pub simulations: usize,
 }
 
+impl Rollout {
+    pub fn new(simulations: usize) -> Self {
+        Self { simulations }
+    }
+}
+
 /// Run a random rollout and return whether this player won or not
 fn random_rollout(rng: &mut rand::rngs::ThreadRng, state: &State, player: Player) -> bool {
     let mut state = state.clone();
     let mut player = player;
     let mut dones = [false; Player::N];
     loop {
+        if dones.iter().all(|u| *u) {
+            // All players are done, the game is over
+            break;
+        }
+
         if dones[usize::from(player)] {
             player = player.next();
             continue;
@@ -23,11 +34,6 @@ fn random_rollout(rng: &mut rand::rngs::ThreadRng, state: &State, player: Player
             dones[usize::from(player)] = true;
             player = player.next();
             continue;
-        }
-
-        if dones.iter().all(|u| *u) {
-            // All players are done, the game is over
-            break;
         }
 
         let mv = moves.choose(rng).unwrap();

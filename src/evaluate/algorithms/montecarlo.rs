@@ -24,20 +24,21 @@ fn random_rollout(rng: &mut rand::rngs::ThreadRng, state: &State, player: Player
     let mut player = player;
     let mut dones = [false; Player::N];
     loop {
+        if dones.iter().all(|u| *u) {
+            // All players are done, the game is over
+            break;
+        }
+
         if dones[usize::from(player)] {
             player = player.next();
             continue;
         }
+
         let moves = state.get_moves(&player);
         if moves.is_empty() {
             dones[usize::from(player)] = true;
             player = player.next();
             continue;
-        }
-
-        if dones.iter().all(|u| *u) {
-            // All players are done, the game is over
-            break;
         }
 
         let mv = moves.choose(rng).unwrap();

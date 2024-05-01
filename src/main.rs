@@ -1,5 +1,5 @@
 use blokus_ai::evaluate::{
-    Distance, GreedyMax, MiniMax, Mix, MonteCarlo, MoveCount, Random, Score, Tournament,
+    Distance, GreedyMax, MiniMax, Mix, MonteCarlo, MoveCount, Random, Rollout, Score, Tournament,
 };
 use std::time::Instant;
 
@@ -14,9 +14,10 @@ fn main() {
             // Box::new(Distance::TowardCorner),
             // Box::new(Distance::FarthestFromCorner),
             // Box::new(Distance::TowardBestOpponent),
-            Box::new(GreedyMax::<Score>::default()),
-            Box::new(GreedyMax::<MoveCount>::default()),
-            // Box::new(MonteCarlo::new(1000, f64::sqrt(2.))),
+            // Box::new(GreedyMax::<Score>::default()),
+            // Box::new(GreedyMax::<MoveCount>::default()),
+            // Box::new(GreedyMax::new(Rollout::new(10))),
+            Box::new(MonteCarlo::new(1000, f64::sqrt(2.))),
             // Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
             //     0.5,
             // )),
@@ -27,7 +28,7 @@ fn main() {
     loop {
         let now = Instant::now();
         tournament.round_robin();
-        println!("Round robin took {} ms", now.elapsed().as_millis());
+        println!("Round robin took {} s", now.elapsed().as_secs());
 
         println!("{}", tournament);
     }

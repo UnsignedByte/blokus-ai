@@ -6,6 +6,15 @@ pub struct GreedyMax<H: Heuristic> {
     heuristic: H,
 }
 
+impl<H> GreedyMax<H>
+where
+    H: Heuristic,
+{
+    pub fn new(heuristic: H) -> Self {
+        Self { heuristic }
+    }
+}
+
 impl<H> Default for GreedyMax<H>
 where
     H: Heuristic + Default,
@@ -43,6 +52,15 @@ where
 
 pub struct GreedyMin<H: Heuristic> {
     heuristic: H,
+}
+
+impl<H> GreedyMin<H>
+where
+    H: Heuristic,
+{
+    pub fn new(heuristic: H) -> Self {
+        Self { heuristic }
+    }
 }
 
 impl<H> Default for GreedyMin<H>
