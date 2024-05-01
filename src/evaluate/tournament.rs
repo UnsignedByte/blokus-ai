@@ -114,13 +114,25 @@ impl Tournament {
             let agent = &self.agents[i];
             let elo = agent.elo;
             // Find all agents within the elo range
-            let opponents: Vec<_> = self
-                .agents
-                .iter()
-                .enumerate()
-                .filter(|(_, a)| (a.elo - elo).abs() < self.elo_range)
-                .map(|(i, _)| i)
-                .collect();
+            let opponents = {
+                let mut elo_range = self.elo_range;
+                loop {
+                    let opponents: Vec<_> = self
+                        .agents
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, a)| (a.elo - elo).abs() < elo_range)
+                        .map(|(i, _)| i)
+                        .collect();
+
+                    if opponents.len() > Player::N {
+                        break opponents;
+                    }
+
+                    // If we don't have enough opponents, increase the range
+                    elo_range *= 2.;
+                }
+            };
 
             // Choose 3 opponents (with replacement)
             let mut players = [i; Player::N];
