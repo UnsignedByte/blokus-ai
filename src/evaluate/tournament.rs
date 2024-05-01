@@ -1,9 +1,11 @@
 use super::Algorithm;
 use crate::game::{Player, State};
 use itertools::Itertools;
+use rand::seq::SliceRandom;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     array,
+    cmp::min,
     fmt::Display,
     iter::repeat,
     time::{Duration, Instant},
@@ -20,10 +22,10 @@ struct Agent {
 }
 
 impl Agent {
-    pub fn new(algorithm: Box<dyn Algorithm + Sync>) -> Self {
+    pub fn new(algorithm: Box<dyn Algorithm + Sync>, elo: f64) -> Self {
         Self {
             algorithm,
-            elo: 0.,
+            elo,
             games_played: 0,
             cumulative_points: 0,
             elapsed: Duration::default(),
@@ -64,13 +66,24 @@ pub struct Tournament {
     agents: Vec<Agent>,
     /// Elo floor
     elo_floor: f64,
+    /// Range of ELO values that agents can play against
+    elo_range: f64,
 }
 
 impl Tournament {
-    pub fn new(elo_floor: f64, algorithms: Vec<Box<dyn Algorithm + Sync>>) -> Self {
+    pub fn new(
+        elo_floor: f64,
+        starting_elo: f64,
+        elo_range: f64,
+        algorithms: Vec<Box<dyn Algorithm + Sync>>,
+    ) -> Self {
         Self {
             elo_floor,
-            agents: algorithms.into_iter().map(Agent::new).collect(),
+            elo_range,
+            agents: algorithms
+                .into_iter()
+                .map(|alg| Agent::new(alg, starting_elo))
+                .collect(),
         }
     }
 
@@ -81,6 +94,44 @@ impl Tournament {
             .multi_cartesian_product()
             .map(|agents| <[usize; Player::N]>::try_from(agents).unwrap())
             .collect();
+
+        let scores: Vec<_> = games
+            .into_iter()
+            .filter_map(|agents| self.simulate_game(agents).map(|scores| (agents, scores)))
+            .collect();
+
+        for (agents, score) in scores {
+            self.update_elo(agents, score)
+        }
+    }
+
+    /// Play one game for each agent
+    /// Each agent chooses opponents with similar ELO
+    pub fn stochastic_round(&mut self) {
+        let mut rng = rand::thread_rng();
+        let mut games = Vec::new();
+        for i in 0..self.agents.len() {
+            let agent = &self.agents[i];
+            let elo = agent.elo;
+            // Find all agents within the elo range
+            let opponents: Vec<_> = self
+                .agents
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| (a.elo - elo).abs() < self.elo_range)
+                .map(|(i, _)| i)
+                .collect();
+
+            // Choose 3 opponents (with replacement)
+            let mut players = [i; Player::N];
+            players[1] = *opponents.choose(&mut rng).unwrap();
+            players[2] = *opponents.choose(&mut rng).unwrap();
+            players[3] = *opponents.choose(&mut rng).unwrap();
+
+            // shuffle the players
+            players.shuffle(&mut rng);
+            games.push(players);
+        }
 
         let scores: Vec<_> = games
             .into_par_iter()
@@ -147,8 +198,12 @@ impl Tournament {
         for player in 0..Player::N {
             let agent = &self.agents[agents[player]];
 
+            // The K value (taken from USCF) is 800 / (N_e + m),
+            // where N_e is the effective number of games played
+            // and m is the number of games played in this tournament (1 as we update every game)
+            let k: f64 = 800. / (min(agent.games_played, 30) as f64 + 1.);
             // We divide the K value by the number of opponents as each player has "played" 3 games
-            const K: f64 = 32. / (Player::N - 1) as f64;
+            let k: f64 = k / (Player::N - 1) as f64;
 
             for o_player in 0..Player::N {
                 if player == o_player {
@@ -165,7 +220,7 @@ impl Tournament {
                 // Algorithm from https://en.wikipedia.org/wiki/Elo_rating_system
                 let ea = 1. / (1.0 + f64::powf(10., (o_agent.elo - agent.elo) / 400.));
 
-                elo_diffs[player] += K * (s - ea);
+                elo_diffs[player] += k * (s - ea);
             }
         }
 
@@ -200,7 +255,12 @@ impl Display for Tournament {
             "{: <w$}{: <15}{: <15}{: <15}{: <15}",
             "Algorithm", "ELO", "Avg Pts", "Avg ms / Game", "Games Played",
         )?;
-        for agent in &self.agents {
+        // sort agents by ELO
+        for agent in self
+            .agents
+            .iter()
+            .sorted_by(|a, b| a.elo.partial_cmp(&b.elo).unwrap())
+        {
             writeln!(
                 f,
                 "{: <w$}{: <15.4}{: <15.4}{: <15.4}{: <15.4}",

@@ -16,6 +16,24 @@ struct Branch {
     visits: usize,
     /// How many players did not play in their last turn
     done: u8,
+    depth: usize,
+}
+
+/// Get the winner at a given state
+/// Ties are broken randomly
+fn get_winner(rng: &mut rand::rngs::ThreadRng, state: &State) -> Player {
+    let scores = state.scores();
+    let max_score = scores.iter().max().unwrap();
+    // Get all players with the max score and choose one randomly
+    // (because ties are broken randomly)
+    let (winner, _) = scores
+        .iter()
+        .enumerate()
+        .filter(|(_, &s)| s == *max_score)
+        .choose(rng)
+        .unwrap();
+
+    Player::from(winner)
 }
 
 /// Run a random rollout and return whether this player won or not
@@ -47,19 +65,7 @@ fn random_rollout(rng: &mut rand::rngs::ThreadRng, state: &State, player: Player
         player = player.next();
     }
 
-    // Check if the player won
-    let scores = state.scores();
-    let max_score = scores.iter().max().unwrap();
-    // Get all players with the max score and choose one randomly
-    // (because ties are broken randomly)
-    let (winner, _) = scores
-        .iter()
-        .enumerate()
-        .filter(|(_, &s)| s == *max_score)
-        .choose(rng)
-        .unwrap();
-
-    winner == usize::from(player)
+    get_winner(rng, &state) == player
 }
 
 enum Node {
@@ -96,10 +102,12 @@ impl Node {
             wins: 0,
             visits: 0,
             done,
+            depth: 0,
         }))
     }
 
     /// Get the UCT value of this node
+    #[inline]
     pub fn score(&self, c: f64, parent_visits: f64) -> f64 {
         match self {
             Node::Branch(Branch { wins, visits, .. }) => {
@@ -119,12 +127,17 @@ impl Node {
                 wins,
                 visits,
                 done,
+                depth,
                 ..
             }) => {
                 // This node has already been initialized
                 // Here, we choose a child based on the UCT algorithm described in
                 // https://en.wikipedia.org/wiki/Monte_Carlo_tree_search
 
+                if *done >= Player::N as u8 {
+                    // All players are done, the game is over
+                    return get_winner(rng, state) == *player;
+                }
                 // shuffle the children to avoid bias
                 children.shuffle(rng);
 
@@ -172,6 +185,7 @@ impl Node {
                         wins: rollout as usize,
                         visits: 1,
                         done: ndone,
+                        depth: *depth + 1,
                     });
 
                     rollout
@@ -185,7 +199,7 @@ impl Node {
                 // Propogate the win upward
                 rollout
             }
-            Node::Leaf(_) => panic!("Cannot rollout an uninitialized node"),
+            Node::Leaf(_) => unreachable!("Cannot rollout an uninitialized node"),
         }
     }
 }

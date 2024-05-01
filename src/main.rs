@@ -6,29 +6,30 @@ use std::time::Instant;
 fn main() {
     let mut tournament = Tournament::new(
         100.,
+        1000.,
+        150.,
         vec![
             Box::new(Random),
-            // Box::new(Mix::<GreedyMax<Score>, Random>::new_ratio(0.5)),
-            // Box::new(Distance::TowardCenter),
-            // Box::new(Distance::FarthestFromCenter),
-            // Box::new(Distance::TowardCorner),
-            // Box::new(Distance::FarthestFromCorner),
-            // Box::new(Distance::TowardBestOpponent),
-            // Box::new(GreedyMax::<Score>::default()),
-            // Box::new(GreedyMax::<MoveCount>::default()),
+            Box::new(Mix::<GreedyMax<Score>, Random>::new_ratio(0.5)),
+            Box::new(Distance::TowardCenter),
+            Box::new(Distance::TowardCorner),
+            Box::new(Distance::TowardBestOpponent),
+            Box::new(GreedyMax::<Score>::default()),
+            Box::new(GreedyMax::<MoveCount>::default()),
             // Box::new(GreedyMax::new(Rollout::new(10))),
-            Box::new(MonteCarlo::new(1000, f64::sqrt(2.))),
-            // Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
-            //     0.5,
-            // )),
-            // Box::new(MiniMax::<2, MoveCount>::default()),
+            // Box::new(MonteCarlo::new(1000, f64::sqrt(2.))),
+            Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
+                0.5,
+            )),
+            Box::new(MiniMax::<2, MoveCount>::default()),
+            Box::new(MiniMax::<3, Score>::default()),
         ],
     );
 
     loop {
         let now = Instant::now();
-        tournament.round_robin();
-        println!("Round robin took {} s", now.elapsed().as_secs());
+        tournament.stochastic_round();
+        println!("Stochastic round took {} s", now.elapsed().as_secs());
 
         println!("{}", tournament);
     }
