@@ -2,7 +2,7 @@ use super::Algorithm;
 use crate::game::{Player, State};
 use colored::Colorize;
 use itertools::Itertools;
-use rand::seq::SliceRandom;
+use rand::{rngs::ThreadRng, seq::SliceRandom};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     array,
@@ -133,51 +133,74 @@ impl Tournament {
     /// Play one game for each agent
     /// Each agent chooses opponents with similar ELO
     pub fn stochastic_round(&mut self) {
-        let mut rng = rand::thread_rng();
-        let mut games = Vec::new();
-        for i in 0..self.agents.len() {
-            let agent = &self.agents[i];
-            let elo = agent.elo;
-            // Find all agents within the elo range
-            let opponents = {
-                let mut elo_range = self.elo_range;
-                loop {
-                    let opponents: Vec<_> = self
-                        .agents
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, a)| (a.elo - elo).abs() < elo_range)
-                        .map(|(i, _)| i)
-                        .collect();
-
-                    if opponents.len() > Player::N {
-                        break opponents;
-                    }
-
-                    // If we don't have enough opponents, increase the range
-                    elo_range *= 2.;
-                }
-            };
-
-            // Choose 3 opponents (with replacement)
-            let mut players = [i; Player::N];
-            players[1] = *opponents.choose(&mut rng).unwrap();
-            players[2] = *opponents.choose(&mut rng).unwrap();
-            players[3] = *opponents.choose(&mut rng).unwrap();
-
-            // shuffle the players
-            players.shuffle(&mut rng);
-            games.push(players);
-        }
-
-        let scores: Vec<_> = games
+        let scores: Vec<_> = (0..self.agents.len())
             .into_par_iter()
+            .map(|i| self.random_game(i))
             .filter_map(|agents| self.simulate_game(agents).map(|scores| (agents, scores)))
             .collect();
 
         for (agents, score) in scores {
             self.update_elo(agents, score)
         }
+    }
+
+    pub fn play_least_played(&mut self, count: usize) {
+        // Find the agent with the least games played
+        let least_played = self
+            .agents
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, a)| a.games_played)
+            .unwrap()
+            .0;
+
+        // Play games with the least played agent `count` times
+        let scores: Vec<_> = (0..count)
+            .into_par_iter()
+            .map(|_| self.random_game(least_played))
+            .filter_map(|agents| self.simulate_game(agents).map(|scores| (agents, scores)))
+            .collect();
+
+        for (agents, score) in scores {
+            self.update_elo(agents, score)
+        }
+    }
+
+    /// Have a single agent choose random opponents to play against
+    /// that have similar ELO
+    pub fn random_game(&self, i: usize) -> [usize; Player::N] {
+        let mut rng = rand::thread_rng();
+        let agent = &self.agents[i];
+        let elo = agent.elo;
+        // Find all agents within the elo range
+        let opponents = {
+            let mut elo_range = self.elo_range;
+            loop {
+                let opponents: Vec<_> = self
+                    .agents
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, a)| (a.elo - elo).abs() < elo_range)
+                    .map(|(i, _)| i)
+                    .collect();
+
+                if opponents.len() > Player::N {
+                    break opponents;
+                }
+
+                // If we don't have enough opponents, increase the range
+                elo_range *= 2.;
+            }
+        };
+
+        let mut players: [usize; Player::N] = array::from_fn(|i| match i {
+            0 => i,
+            _ => *opponents.choose(&mut rng).unwrap(),
+        });
+
+        // shuffle the players
+        players.shuffle(&mut rng);
+        players
     }
 
     /// Run a single game with 4 agents

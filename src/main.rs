@@ -2,18 +2,15 @@ use blokus_ai::evaluate::{
     Distance, EnemyMoveCount, GreedyMax, GreedyMin, MiniMax, Mix, MonteCarlo, MoveCount, Opening,
     Random, Rollout, Score, Tournament,
 };
-use std::{
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::{path::PathBuf, time::Instant};
 
 fn main() {
     let tpath = PathBuf::from("tournament.json");
 
     let mut tournament = Tournament::new(
         100.,
-        1000.,
-        150.,
+        1200.,
+        200.,
         vec![
             Box::new(Random),
             Box::new(GreedyMin::<Score>::default()),
@@ -22,7 +19,9 @@ fn main() {
             Box::new(Mix::<GreedyMax<MoveCount>, Random>::new_ratio(0.5)),
             Box::new(GreedyMin::<EnemyMoveCount>::default()),
             Box::new(Distance::TowardCenter),
+            Box::new(Distance::AwayFromCenter),
             Box::new(Distance::TowardCorner),
+            Box::new(Distance::AwayFromCorner),
             Box::new(Distance::TowardBestOpponent),
             Box::new(GreedyMax::<Score>::default()),
             Box::new(GreedyMax::<MoveCount>::default()),
@@ -82,8 +81,8 @@ fn main() {
 
     loop {
         let now = Instant::now();
-        tournament.stochastic_round();
-        println!("Stochastic round took {} s", now.elapsed().as_secs());
+        tournament.play_least_played(250);
+        println!("Round took {} s", now.elapsed().as_secs());
 
         println!("{}", tournament);
         tournament
