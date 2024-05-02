@@ -72,6 +72,7 @@ impl Distance {
     }
 }
 
+unsafe impl Send for Distance {}
 unsafe impl Sync for Distance {}
 
 impl Algorithm for Distance {

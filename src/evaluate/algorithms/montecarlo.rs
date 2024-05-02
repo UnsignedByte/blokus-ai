@@ -16,7 +16,6 @@ struct Branch {
     visits: usize,
     /// How many players did not play in their last turn
     done: u8,
-    depth: usize,
 }
 
 /// Get the winner at a given state
@@ -102,7 +101,6 @@ impl Node {
             wins: 0,
             visits: 0,
             done,
-            depth: 0,
         }))
     }
 
@@ -127,7 +125,6 @@ impl Node {
                 wins,
                 visits,
                 done,
-                depth,
                 ..
             }) => {
                 // This node has already been initialized
@@ -185,7 +182,6 @@ impl Node {
                         wins: rollout as usize,
                         visits: 1,
                         done: ndone,
-                        depth: *depth + 1,
                     });
 
                     rollout

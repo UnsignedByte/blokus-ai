@@ -2,16 +2,21 @@ use blokus_ai::evaluate::{
     Distance, EnemyMoveCount, GreedyMax, GreedyMin, MiniMax, Mix, MonteCarlo, MoveCount, Random,
     Rollout, Score, Tournament,
 };
-use std::time::Instant;
+use std::{
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 fn main() {
+    let tpath = PathBuf::from("tournament.json");
+
     let mut tournament = Tournament::new(
         100.,
         1000.,
         150.,
         vec![
             Box::new(Random),
-            Box::new(Mix::<GreedyMin<Score>, Random>::new_ratio(0.5)),
+            Box::new(GreedyMin::<Score>::default()),
             Box::new(Mix::<GreedyMax<Score>, Random>::new_ratio(0.5)),
             Box::new(Mix::<GreedyMax<MoveCount>, Random>::new_ratio(0.5)),
             Box::new(GreedyMin::<EnemyMoveCount>::default()),
@@ -25,10 +30,23 @@ fn main() {
             Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
                 0.5,
             )),
+            Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
+                0.25,
+            )),
+            Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
+                0.75,
+            )),
+            Box::new(Mix::new(
+                Distance::TowardBestOpponent,
+                GreedyMax::<Score>::default(),
+                0.5,
+            )),
             Box::new(MiniMax::<2, MoveCount>::default()),
             Box::new(MiniMax::<3, Score>::default()),
         ],
-    );
+        std::fs::File::open(tpath.clone()).ok(),
+    )
+    .expect("Failed to load tournament");
 
     loop {
         let now = Instant::now();
@@ -36,6 +54,9 @@ fn main() {
         println!("Stochastic round took {} s", now.elapsed().as_secs());
 
         println!("{}", tournament);
+        tournament
+            .save(tpath.clone())
+            .expect("Failed to save tournament");
     }
 }
 

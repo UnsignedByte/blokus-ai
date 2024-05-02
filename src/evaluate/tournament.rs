@@ -6,15 +6,20 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     array,
     cmp::min,
+    collections::HashMap,
     fmt::Display,
     iter::repeat,
+    path::PathBuf,
     time::{Duration, Instant},
 };
+
+/// Type alias for the serialization of the tournament statistics
+type Store = HashMap<String, (f64, usize, usize, Duration)>;
 
 /// Player in a tournament
 /// Contains statistics about the player
 struct Agent {
-    algorithm: Box<dyn Algorithm + Sync>,
+    algorithm: Box<dyn Algorithm + Sync + Send>,
     elo: f64,
     games_played: usize,
     cumulative_points: usize,
@@ -22,7 +27,7 @@ struct Agent {
 }
 
 impl Agent {
-    pub fn new(algorithm: Box<dyn Algorithm + Sync>, elo: f64) -> Self {
+    pub fn new(algorithm: Box<dyn Algorithm + Sync + Send>, elo: f64) -> Self {
         Self {
             algorithm,
             elo,
@@ -75,16 +80,35 @@ impl Tournament {
         elo_floor: f64,
         starting_elo: f64,
         elo_range: f64,
-        algorithms: Vec<Box<dyn Algorithm + Sync>>,
-    ) -> Self {
-        Self {
+        algorithms: Vec<Box<dyn Algorithm + Sync + Send>>,
+        load: Option<std::fs::File>,
+    ) -> Result<Self, serde_json::Error> {
+        // Load Store from file
+        let load: Option<Store> = load.map(serde_json::from_reader).transpose()?;
+        let load = load.unwrap_or_default();
+        Ok(Self {
             elo_floor,
             elo_range,
             agents: algorithms
                 .into_iter()
-                .map(|alg| Agent::new(alg, starting_elo))
+                .map(|alg| match load.get(&alg.name()).cloned() {
+                    Some((elo, games_played, cumulative_points, elapsed)) => Agent {
+                        algorithm: alg,
+                        elo,
+                        games_played,
+                        cumulative_points,
+                        elapsed,
+                    },
+                    None => Agent::new(alg, starting_elo),
+                })
                 .collect(),
-        }
+        })
+    }
+
+    pub fn save(&self, path: PathBuf) -> Result<(), serde_json::Error> {
+        let store = Store::from(self);
+        let file = std::fs::File::create(path).unwrap();
+        serde_json::to_writer(file, &store)
     }
 
     /// Simulate one round robin round
@@ -284,5 +308,25 @@ impl Display for Tournament {
             )?;
         }
         Ok(())
+    }
+}
+
+impl From<&Tournament> for Store {
+    fn from(value: &Tournament) -> Self {
+        value
+            .agents
+            .iter()
+            .map(|agent| {
+                (
+                    agent.algorithm.name(),
+                    (
+                        agent.elo,
+                        agent.games_played,
+                        agent.cumulative_points,
+                        agent.elapsed,
+                    ),
+                )
+            })
+            .collect()
     }
 }

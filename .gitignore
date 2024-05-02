@@ -182,3 +182,6 @@ perf.data
 perf.data.old
 
 flamegraph.svg
+
+# Tournament data
+tournament.json
