@@ -1,9 +1,8 @@
+use colored::{Color, Colorize};
 use std::{
     fmt::{Debug, Display},
     ops::Add,
 };
-
-use ansi_term::Color;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 /// A piece ID.
@@ -237,8 +236,7 @@ impl Player {
 
 impl Display for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let color = self.color();
-        write!(f, "{}", color.paint(format!("{}", usize::from(self))))
+        write!(f, "{}", stringify!(usize::from(self)).color(self.color()))
     }
 }
 

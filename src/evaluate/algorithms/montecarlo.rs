@@ -219,6 +219,7 @@ impl Algorithm for MonteCarlo {
         rng: &mut rand::rngs::ThreadRng,
         state: &State,
         player: &Player,
+        _: usize,
     ) -> Option<Move> {
         if let Some(mut root) = Node::root(state.clone(), *player) {
             for _ in 0..self.simulations {

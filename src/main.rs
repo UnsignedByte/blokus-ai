@@ -1,6 +1,6 @@
 use blokus_ai::evaluate::{
-    Distance, EnemyMoveCount, GreedyMax, GreedyMin, MiniMax, Mix, MonteCarlo, MoveCount, Random,
-    Rollout, Score, Tournament,
+    Distance, EnemyMoveCount, GreedyMax, GreedyMin, MiniMax, Mix, MonteCarlo, MoveCount, Opening,
+    Random, Rollout, Score, Tournament,
 };
 use std::{
     path::{Path, PathBuf},
@@ -17,6 +17,7 @@ fn main() {
         vec![
             Box::new(Random),
             Box::new(GreedyMin::<Score>::default()),
+            Box::new(GreedyMin::<MoveCount>::default()),
             Box::new(Mix::<GreedyMax<Score>, Random>::new_ratio(0.5)),
             Box::new(Mix::<GreedyMax<MoveCount>, Random>::new_ratio(0.5)),
             Box::new(GreedyMin::<EnemyMoveCount>::default()),
@@ -34,12 +35,43 @@ fn main() {
                 0.25,
             )),
             Box::new(Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(
-                0.75,
+                0.25,
             )),
+            Box::new(Mix::<GreedyMin<EnemyMoveCount>, GreedyMax<MoveCount>>::new_ratio(0.5)),
             Box::new(Mix::new(
                 Distance::TowardBestOpponent,
                 GreedyMax::<Score>::default(),
                 0.5,
+            )),
+            Box::new(Opening::new(
+                Distance::TowardCenter,
+                GreedyMax::<Score>::default(),
+                5,
+            )),
+            Box::new(Opening::new(
+                Distance::TowardCenter,
+                GreedyMax::<Score>::default(),
+                6,
+            )),
+            Box::new(Opening::new(
+                Distance::TowardCenter,
+                GreedyMax::<Score>::default(),
+                4,
+            )),
+            Box::new(Opening::new(
+                Distance::TowardCenter,
+                Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(0.75),
+                5,
+            )),
+            Box::new(Opening::new(
+                Distance::TowardCenter,
+                Mix::<GreedyMax<Score>, GreedyMax<MoveCount>>::new_ratio(0.5),
+                5,
+            )),
+            Box::new(Opening::new(
+                Distance::TowardCenter,
+                MiniMax::<2, MoveCount>::default(),
+                5,
             )),
             Box::new(MiniMax::<2, MoveCount>::default()),
             Box::new(MiniMax::<3, Score>::default()),

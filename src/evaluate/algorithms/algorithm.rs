@@ -8,6 +8,7 @@ pub trait Algorithm {
         rng: &mut rand::rngs::ThreadRng,
         state: &State,
         player: &Player,
+        move_number: usize,
     ) -> Option<Move>;
 
     /// String name for the algorithm

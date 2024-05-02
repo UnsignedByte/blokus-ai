@@ -16,6 +16,7 @@ impl Algorithm for Random {
         rng: &mut rand::rngs::ThreadRng,
         state: &crate::game::State,
         player: &crate::game::Player,
+        _: usize,
     ) -> Option<crate::game::Move> {
         let moves = state.get_moves(player);
         moves.choose(rng).cloned()

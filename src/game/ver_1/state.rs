@@ -3,7 +3,7 @@ use crate::game::{
     utils::{PieceID, PieceTransformID},
     Corner, Dimensioned, Player,
 };
-use ansi_term::Color;
+use colored::{Color, Colorize};
 use core::panic;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -325,7 +325,7 @@ impl Display for State {
                 let cell = self.board.get(col, row).unwrap();
                 let color = match cell {
                     0b0000 => None,
-                    0b1111 => Some(Color::Purple),
+                    0b1111 => Some(Color::Magenta),
                     x if x == Player::Player1.mask() => Some(Player::Player1.color()),
                     x if x == Player::Player2.mask() => Some(Player::Player2.color()),
                     x if x == Player::Player3.mask() => Some(Player::Player3.color()),
@@ -336,7 +336,7 @@ impl Display for State {
                     f,
                     "{}",
                     color
-                        .map(|color| color.paint(format!("{:x}", cell)))
+                        .map(|color| format!("{:x}", cell).color(color))
                         .unwrap_or_else(|| format!("{:x}", cell).into())
                 )?;
             }

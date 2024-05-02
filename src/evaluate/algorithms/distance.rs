@@ -92,6 +92,7 @@ impl Algorithm for Distance {
         rng: &mut rand::rngs::ThreadRng,
         state: &State,
         player: &Player,
+        _: usize,
     ) -> Option<crate::game::Move> {
         // we shuffle here so that ties are resolved randomly
         let mut moves = state.get_moves(player);

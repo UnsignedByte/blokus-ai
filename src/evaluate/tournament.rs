@@ -1,5 +1,6 @@
 use super::Algorithm;
 use crate::game::{Player, State};
+use colored::Colorize;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -193,15 +194,20 @@ impl Tournament {
         let mut game = State::new(20, 20);
         let mut alive = true;
         let mut times = [Duration::default(); Player::N];
+        let mut move_number = 0;
         // run as long as a player is still playing
         while alive {
             alive = false;
+            move_number += 1;
             for player in Player::iter() {
                 let pid = usize::from(player);
 
                 let agent = &self.agents[agents[pid]];
                 let now = Instant::now();
-                if let Some(mv) = agent.algorithm.decide(&mut rng, &game, &player) {
+                if let Some(mv) = agent
+                    .algorithm
+                    .decide(&mut rng, &game, &player, move_number)
+                {
                     game.place_piece(&mv);
                     alive = true;
                 }
@@ -300,7 +306,7 @@ impl Display for Tournament {
             writeln!(
                 f,
                 "{: <w$}{: <15.4}{: <15.4}{: <15.4}{: <15.4}",
-                agent.algorithm.name(),
+                agent.algorithm.name().yellow(),
                 agent.elo,
                 (agent.cumulative_points as f32) / (agent.games_played as f32),
                 (agent.elapsed.as_millis() as f32) / (agent.games_played as f32),

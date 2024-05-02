@@ -36,6 +36,7 @@ where
         rng: &mut rand::rngs::ThreadRng,
         state: &State,
         player: &Player,
+        _: usize,
     ) -> Option<Move> {
         // we shuffle here so that ties are resolved randomly
         let mut moves = state.get_moves(player);
@@ -84,6 +85,7 @@ where
         rng: &mut rand::rngs::ThreadRng,
         state: &State,
         player: &Player,
+        _: usize,
     ) -> Option<Move> {
         // we shuffle here so that ties are resolved randomly
         let mut moves = state.get_moves(player);

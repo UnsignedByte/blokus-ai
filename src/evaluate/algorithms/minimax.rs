@@ -59,7 +59,7 @@ fn minimax<H: Heuristic>(
                     nstate.place_piece(&mv);
 
                     minimax(
-                        rng, 
+                        rng,
                         depth - 1,
                         evaluating_player,
                         &player.next(),
@@ -86,6 +86,7 @@ impl<const DEPTH: usize, H: Heuristic> Algorithm for MiniMax<DEPTH, H> {
         rng: &mut rand::rngs::ThreadRng,
         state: &State,
         player: &Player,
+        _: usize,
     ) -> Option<Move> {
         // Find the move that maximizes the minimax algorithm
         let mut moves = state.get_moves(player);

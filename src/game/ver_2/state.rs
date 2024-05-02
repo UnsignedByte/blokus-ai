@@ -1,10 +1,10 @@
-use once_cell::sync::Lazy;
-
 use super::{
     utils::{rotate_down_1, shift_left_1},
     Piece,
 };
 use crate::game::Player;
+use colored::Colorize;
+use once_cell::sync::Lazy;
 use std::{
     arch::x86_64::*,
     cmp::min,
@@ -491,26 +491,26 @@ impl Debug for State {
             writeln!(
                 f,
                 "Color Mask for player {}:",
-                color.paint(format!("{}", pid))
+                format!("{}", pid).color(color)
             )?;
             self.color_masks[usize::from(player)].iter().for_each(|x| {
                 writeln!(
                     f,
                     "{}",
-                    color.paint(format!("{:020b}", x & ((1 << 20) - 1)))
+                    format!("{:020b}", x & ((1 << 20) - 1)).color(color)
                 )
                 .unwrap();
             });
             writeln!(
                 f,
                 "Corner Mask for player {}:",
-                color.paint(format!("{}", pid))
+                format!("{}", pid).color(color)
             )?;
             self.corner_masks[usize::from(player)].iter().for_each(|x| {
                 writeln!(
                     f,
                     "{}",
-                    color.paint(format!("{:020b}", x & ((1 << 20) - 1)))
+                    format!("{:020b}", x & ((1 << 20) - 1)).color(color)
                 )
                 .unwrap();
             });
