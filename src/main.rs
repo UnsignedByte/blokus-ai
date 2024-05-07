@@ -81,7 +81,7 @@ fn main() {
 
     loop {
         let now = Instant::now();
-        tournament.play_least_played(250);
+        tournament.stochastic_round(5);
         println!("Round took {} s", now.elapsed().as_secs());
 
         println!("{}", tournament);

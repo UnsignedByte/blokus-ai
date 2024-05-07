@@ -2,7 +2,7 @@ use super::Algorithm;
 use crate::game::{Player, State};
 use colored::Colorize;
 use itertools::Itertools;
-use rand::{rngs::ThreadRng, seq::SliceRandom};
+use rand::seq::SliceRandom;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     array,
@@ -132,8 +132,10 @@ impl Tournament {
 
     /// Play one game for each agent
     /// Each agent chooses opponents with similar ELO
-    pub fn stochastic_round(&mut self) {
+    pub fn stochastic_round(&mut self, count: usize) {
         let scores: Vec<_> = (0..self.agents.len())
+            .flat_map(|i| repeat(i).take(count))
+            .collect::<Vec<_>>()
             .into_par_iter()
             .map(|i| self.random_game(i))
             .filter_map(|agents| self.simulate_game(agents).map(|scores| (agents, scores)))
@@ -336,6 +338,17 @@ impl Display for Tournament {
                 agent.games_played,
             )?;
         }
+
+        // in one game, 4 players each play 1 game, so divide by 4
+        writeln!(
+            f,
+            "Total games played: {}",
+            self.agents
+                .iter()
+                .map(|agent| agent.games_played)
+                .sum::<usize>()
+                / Player::N
+        )?;
         Ok(())
     }
 }
